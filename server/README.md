@@ -25,6 +25,7 @@ Backups: panel → *Settings → Backups* (o `POST /api/backups` con sesión de 
 # 1) backup (panel: Settings → Backups) o por API; 2) copiar; 3) reiniciar solo multimarket-pb
 rsync -av server/pb_migrations/ $MM_SSH:$MM_REMOTE_DIR/pb_migrations/
 rsync -av server/pb_hooks/      $MM_SSH:$MM_REMOTE_DIR/pb_hooks/
+# los hooks se recargan solos al copiarlos; solo reinicia si cambias migraciones:
 ssh $MM_SSH "cd $MM_REMOTE_DIR && docker compose restart && docker logs --tail 20 $MM_CONTAINER"
 MM_URL=https://tu-servidor python3 server/tests/integration_test.py
 ```

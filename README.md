@@ -28,8 +28,10 @@ Los datos abiertos de precios en España son aún escasos: hay un modo «precios
 ### Estado y hoja de ruta
 - Hecho: listas privadas y compartidas (PocketBase), fotos y productos nuevos con moderación, escáner de códigos,
   cantidad e historial de compras, política de privacidad y borrado de cuenta, copias de seguridad diarias.
-- Próximo: recompra (sugerencias «fantasma» a partir del historial), OCR de tickets en el dispositivo,
-  modo escáner durante la compra, comparativa de productos por precio/kg o litro, pasillos, API pública de la base común.
+- Hecho también: recompra, OCR de tickets en el dispositivo (foto, imagen o PDF), escáner durante la compra, comparativa por precio/kg,
+  API pública de solo lectura (`docs/API.md`).
+- Próximo: notificaciones con ntfy («voy yo», ofertas que caducan),
+  pasillos, copia opcional de la lista privada en el servidor.
 - Servidor: ver `server/README.md`. Los datos privados (servidor, correo de administración) van **fuera** del repositorio,
   en `../MultiMarket-privado/config.env`.
 
