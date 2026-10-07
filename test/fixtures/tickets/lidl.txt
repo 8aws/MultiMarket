@@ -1,0 +1,19 @@
+LIDL SUPERMERCADOS S.A.U.
+Ctra. de Ejemplo Km. 10.
+28000 Ciudad - Barrio
+EUR
+YOGUR GRIEGO PACK 4        1,99 B
+   PROMO LIDL PLUS        -0,20
+MANZANA GOLDEN             2,31 A
+  0,925 kg x 2,50  EUR/kg
+   PROMO LIDL PLUS        -0,12
+PAN DE MOLDE               1,35 B
+CEREALES MIEL    2,20x   3  6,60 B
+   PROMO LIDL PLUS        -0,33
+QUESO FRESCO               2,05 A
+   Desc.                  -0,50
+   PROMO LIDL PLUS        -0,05
+-------------------------------
+Total                     13,10
+ENTREGA                   13,10
+12/10/2026   10:15:30

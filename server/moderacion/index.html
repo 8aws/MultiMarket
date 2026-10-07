@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>MultiMarket · Moderación</title>
+<style>
+:root{--bg:#f2f2f7;--card:#fff;--tx:#1c1c1e;--mut:#6e6e73;--line:#e5e5ea;--acc:#1456a8;--ok:#1f9d4a;--bad:#d93025}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--tx:#f2f2f7;--mut:#9a9aa0;--line:#38383a;--acc:#6aa6ff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 -apple-system,system-ui,sans-serif}
+header{position:sticky;top:0;background:var(--bg);padding:12px 16px;display:flex;gap:12px;align-items:center;border-bottom:1px solid var(--line);z-index:2}
+h1{font-size:18px;margin:0;flex:1}
+main{max-width:760px;margin:0 auto;padding:12px 16px 80px}
+.tabs{display:flex;gap:8px;margin:8px 0 12px}.tabs button{flex:1}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--tx);padding:9px 14px;border-radius:10px;cursor:pointer}
+button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+button.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+button.bad{background:var(--bad);border-color:var(--bad);color:#fff}
+button:disabled{opacity:.5}
+input{font:inherit;width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--tx);margin:6px 0}
+.card{background:var(--card);border-radius:12px;padding:12px;margin:10px 0;display:flex;gap:12px;border:1px solid var(--line)}
+.card img{width:96px;height:96px;object-fit:cover;border-radius:8px;background:var(--line);flex:none}
+.card .b{flex:1;min-width:0}.card h3{margin:0 0 2px;font-size:16px;overflow-wrap:anywhere}
+.mut{color:var(--mut);font-size:13px}
+.row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.login{max-width:360px;margin:60px auto;padding:0 16px}
+.msg{color:var(--bad);min-height:1.4em}
+.empty{text-align:center;color:var(--mut);padding:40px 0}
+.tag{display:inline-block;background:var(--line);border-radius:6px;padding:0 6px;font-size:12px;margin-right:4px}
+.regla{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:8px 0;font-size:13px;color:var(--mut)}
+#crop{position:fixed;inset:0;background:#000d;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:12px}
+#crop canvas{max-width:100%;max-height:70vh;touch-action:none;background:#222;border-radius:8px}
+#crop .row{justify-content:center}
+#crop label{color:#fff;font-size:14px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// Moderación de contenido de la comunidad. Solo para superusuarios (contraseña + código por correo).
+const API = location.origin;
+let token = sessionStorage.getItem('mm_tok') || '';
+let tab = 'fotos';
+let items = [];
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function api(path, opt = {}) {
+  const r = await fetch(API + path, {
+    ...opt,
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: token } : {}), ...(opt.headers || {}) },
+    body: opt.body ? JSON.stringify(opt.body) : undefined,
+  });
+  let d = {}; try { d = await r.json(); } catch (_) {}
+  if (r.status === 401 && token && !path.includes('auth-')) { logout(); throw new Error('Sesión caducada'); }
+  return { status: r.status, data: d };
+}
+
+// ---------------------------------------------------------------- login
+function loginView(msg = '') {
+  $('#app').innerHTML = `<div class="login"><h1>Moderación</h1>
+    <p class="mut">Acceso de administrador. Se pedirá un código que llegará a tu correo.</p>
+    <input id="em" type="email" placeholder="Correo" autocomplete="username">
+    <input id="pw" type="password" placeholder="Contraseña" autocomplete="current-password">
+    <p class="msg" id="msg">${esc(msg)}</p>
+    <button class="on" id="go" style="width:100%">Entrar</button></div>`;
+  $('#go').onclick = login;
+  $('#pw').onkeydown = e => { if (e.key === 'Enter') login(); };
+}
+async function login() {
+  const identity = $('#em').value.trim(), password = $('#pw').value;
+  $('#msg').textContent = ''; $('#go').disabled = true;
+  try {
+    const r = await api('/api/collections/_superusers/auth-with-password', { method: 'POST', body: { identity, password } });
+    if (r.status === 200) return entrar(r.data.token);
+    if (r.status === 401 && r.data.mfaId) return pedirCodigo(identity, r.data.mfaId);
+    $('#msg').textContent = 'Correo o contraseña incorrectos.';
+  } catch (e) { $('#msg').textContent = 'No se pudo conectar.'; }
+  $('#go').disabled = false;
+}
+async function pedirCodigo(email, mfaId) {
+  const o = await api('/api/collections/_superusers/request-otp', { method: 'POST', body: { email } });
+  if (o.status !== 200) return loginView('No se pudo enviar el código.');
+  $('#app').innerHTML = `<div class="login"><h1>Código</h1>
+    <p class="mut">Te hemos enviado un código por correo (caduca en 5 minutos).</p>
+    <input id="otp" inputmode="numeric" placeholder="Código" autocomplete="one-time-code">
+    <p class="msg" id="msg"></p><button class="on" id="go" style="width:100%">Verificar</button></div>`;
+  const ok = async () => {
+    $('#go').disabled = true;
+    const r = await api('/api/collections/_superusers/auth-with-otp', { method: 'POST', body: { otpId: o.data.otpId, password: $('#otp').value.trim(), mfaId } });
+    if (r.status === 200) return entrar(r.data.token);
+    $('#msg').textContent = 'Código incorrecto o caducado.'; $('#go').disabled = false;
+  };
+  $('#go').onclick = ok; $('#otp').onkeydown = e => { if (e.key === 'Enter') ok(); };
+  $('#otp').focus();
+}
+function entrar(t) { token = t; sessionStorage.setItem('mm_tok', t); cargar(); }
+function logout() { token = ''; sessionStorage.removeItem('mm_tok'); loginView(); }
+
+// ---------------------------------------------------------------- imágenes
+// Todo lo que se aprueba se reconstruye con canvas: sale un JPEG "pelado" (sin EXIF, GPS ni perfil).
+const fotoUrl = (f, thumb) => `${API}/api/files/${f.collectionId}/${f.id}/${f.file}${thumb ? '?thumb=200x200' : ''}`;
+
+async function cargarBitmap(url) {
+  const r = await fetch(url); if (!r.ok) throw new Error('No se pudo descargar la foto');
+  return createImageBitmap(await r.blob(), { imageOrientation: 'from-image' }); // aplica la rotación EXIF
+}
+function aJpeg(bitmap, rect) {
+  const sx = rect ? rect.x : 0, sy = rect ? rect.y : 0, sw = rect ? rect.w : bitmap.width, sh = rect ? rect.h : bitmap.height;
+  const k = Math.min(1, 1600 / Math.max(sw, sh));
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(sw * k)); c.height = Math.max(1, Math.round(sh * k));
+  c.getContext('2d').drawImage(bitmap, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  return new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('No se pudo recodificar')), 'image/jpeg', 0.9));
+}
+async function reemplazarFoto(f, blob, estado, nota) {
+  const fd = new FormData(); fd.append('file', blob, 'foto.jpg');
+  if (estado) fd.append('status', estado);
+  if (nota) fd.append('note', nota);
+  const r = await fetch(`${API}/api/collections/fotos/records/${f.id}`, { method: 'PATCH', headers: { Authorization: token }, body: fd });
+  let d = {}; try { d = await r.json(); } catch (_) {}
+  return { status: r.status, data: d };
+}
+
+// recorte: arrastrar para dibujar el rectángulo sobre la foto
+function recortar(f) {
+  return new Promise(async resolve => {
+    let bmp; try { bmp = await cargarBitmap(fotoUrl(f)); } catch (e) { alert(e.message); return resolve(null); }
+    const ov = document.createElement('div'); ov.id = 'crop';
+    ov.innerHTML = `<div style="color:#fff;font-size:14px">Arrastra sobre la foto para elegir la zona. Se recorta con pérdida y se elimina la original.</div>
+      <canvas></canvas>
+      <label><input type="checkbox" id="sq" style="width:auto;margin:0 6px 0 0" checked>Mantener cuadrado</label>
+      <div class="row"><button class="ok" id="c-ok">Recortar y aprobar</button><button id="c-solo">Recortar (dejar pendiente)</button><button id="c-no">Cancelar</button></div>`;
+    document.body.appendChild(ov);
+    const cv = $('canvas', ov), ctx = cv.getContext('2d');
+    const esc2 = Math.min(1, 900 / Math.max(bmp.width, bmp.height));
+    cv.width = Math.round(bmp.width * esc2); cv.height = Math.round(bmp.height * esc2);
+    let sel = { x: 0, y: 0, w: cv.width, h: cv.height }, ini = null;
+    const pintar = () => {
+      ctx.drawImage(bmp, 0, 0, cv.width, cv.height);
+      ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(bmp, sel.x / esc2, sel.y / esc2, sel.w / esc2, sel.h / esc2, sel.x, sel.y, sel.w, sel.h);
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(sel.x, sel.y, sel.w, sel.h);
+    };
+    const pos = e => { const r = cv.getBoundingClientRect(); const rw = r.width || cv.width, rh = r.height || cv.height; return { x: (e.clientX - r.left) * cv.width / rw, y: (e.clientY - r.top) * cv.height / rh }; };
+    cv.onpointerdown = e => { cv.setPointerCapture(e.pointerId); ini = pos(e); };
+    cv.onpointermove = e => {
+      if (!ini) return; const p = pos(e);
+      let w = p.x - ini.x, h = p.y - ini.y;
+      if ($('#sq', ov).checked) { const m = Math.max(Math.abs(w), Math.abs(h)); w = Math.sign(w || 1) * m; h = Math.sign(h || 1) * m; }
+      let x = Math.min(ini.x, ini.x + w), y = Math.min(ini.y, ini.y + h), ww = Math.abs(w), hh = Math.abs(h);
+      x = Math.max(0, x); y = Math.max(0, y); ww = Math.min(ww, cv.width - x); hh = Math.min(hh, cv.height - y);
+      if ($('#sq', ov).checked) { const m = Math.min(ww, hh); ww = m; hh = m; }
+      sel = { x, y, w: ww, h: hh }; pintar();
+    };
+    cv.onpointerup = () => { ini = null; };
+    pintar();
+    const fin = v => { ov.remove(); resolve(v); };
+    const rect = () => { const r = { x: Math.round(sel.x / esc2), y: Math.round(sel.y / esc2), w: Math.max(8, Math.round(sel.w / esc2)), h: Math.max(8, Math.round(sel.h / esc2)) }; return Object.values(r).every(Number.isFinite) ? r : null; };
+    const hacer = aprobar => async () => { try { fin({ blob: await aJpeg(bmp, rect()), aprobar }); } catch (e) { alert('No se pudo recortar: ' + e.message); } };
+    $('#c-ok', ov).onclick = hacer(true);
+    $('#c-solo', ov).onclick = hacer(false);
+    $('#c-no', ov).onclick = () => fin(null);
+  });
+}
+
+// ---------------------------------------------------------------- listado
+const filtroPend = encodeURIComponent("status='pending'");
+async function listar(col, filtro, extra = '') {
+  let r = await api(`/api/collections/${col}/records?filter=${filtro}&sort=created&perPage=100${extra}`);
+  if (r.status === 400) r = await api(`/api/collections/${col}/records?filter=${filtro}&perPage=100${extra}`);
+  return r;
+}
+async function cargar() {
+  const col = tab === 'productos' ? 'productos' : tab === 'reportes' ? 'reportes' : 'fotos';
+  const r = col === 'reportes'
+    ? await listar('reportes', encodeURIComponent("status='open'"), '&expand=foto')
+    : await listar(col, filtroPend);
+  if (r.status === 401 || r.status === 403) return loginView('Sin permiso: entra con una cuenta de superusuario.');
+  if (r.status !== 200) { $('#app').innerHTML = `<div class="login"><h1>Error</h1><p class="msg">${esc(r.data.message || r.status)}</p><button id="re">Reintentar</button> <button id="out">Salir</button></div>`; $('#re').onclick = cargar; $('#out').onclick = logout; return; }
+  items = r.data.items || [];
+  const cnt = {};
+  for (const [k, c, f] of [['fotos', 'fotos', filtroPend], ['productos', 'productos', filtroPend], ['reportes', 'reportes', encodeURIComponent("status='open'")]]) {
+    const x = await api(`/api/collections/${c}/records?filter=${f}&perPage=1`);
+    cnt[k] = x.data.totalItems ?? 0;
+  }
+  pintar(cnt);
+}
+
+function botones(id, extra = '') {
+  return `<div class="row"><button class="ok" data-a="approved" data-id="${id}">Aprobar</button>${extra}<button class="bad" data-a="rejected" data-id="${id}">Rechazar</button></div>`;
+}
+function pintar(cnt) {
+  let cards = '';
+  if (tab === 'fotos') cards = items.map(it => `
+    <div class="card" data-id="${it.id}"><a href="${fotoUrl(it)}" target="_blank"><img src="${fotoUrl(it, true)}" alt=""></a>
+      <div class="b"><h3>${esc(it.name || it.key)}</h3><div class="mut">clave: ${esc(it.key)}${it.barcode ? ' · código ' + esc(it.barcode) : ''}</div>
+      <div class="mut">${esc((it.created || '').slice(0, 16))}</div>
+      ${botones(it.id, `<button data-a="crop" data-id="${it.id}">Recortar</button>`)}</div></div>`).join('');
+  else if (tab === 'productos') cards = items.map(it => `
+    <div class="card" data-id="${it.id}">${it.image_url ? `<img src="${esc(it.image_url)}" alt="">` : ''}
+      <div class="b"><h3>${esc(it.name)}</h3><div class="mut">${esc([it.brand, it.quantity].filter(Boolean).join(' · '))}</div>
+      <div>${it.cold ? '<span class="tag">❄️ frío</span>' : ''}${it.own_chain ? `<span class="tag">exclusivo ${esc(it.own_chain)}</span>` : ''}<span class="tag">${esc(it.key)}</span></div>
+      <div class="mut">equivalencia: ${esc(it.generic_key || '—')}</div>${botones(it.id)}</div></div>`).join('');
+  else cards = items.map(it => { const f = it.expand && it.expand.foto; return `
+    <div class="card" data-id="${it.id}">${f ? `<a href="${fotoUrl(f)}" target="_blank"><img src="${fotoUrl(f, true)}" alt=""></a>` : ''}
+      <div class="b"><h3>${esc(it.motivo)}</h3><div class="mut">${esc(it.nota || '')}</div>
+      <div class="mut">foto de: ${esc(f ? (f.name || f.key) : '(borrada)')} · estado ${esc(f ? f.status : '')}</div>
+      <div class="row"><button class="bad" data-a="retirar" data-id="${it.id}" data-foto="${f ? f.id : ''}">Retirar foto</button><button data-a="dismissed" data-id="${it.id}">Descartar reporte</button></div></div></div>`; }).join('');
+  $('#app').innerHTML = `<header><h1>Moderación</h1><button id="out">Salir</button></header>
+    <main><div class="tabs"><button id="t1" class="${tab === 'fotos' ? 'on' : ''}">Fotos (${cnt.fotos})</button>
+    <button id="t2" class="${tab === 'productos' ? 'on' : ''}">Productos (${cnt.productos})</button>
+    <button id="t3" class="${tab === 'reportes' ? 'on' : ''}">Reportes (${cnt.reportes})</button></div>
+    ${tab === 'fotos' ? '<div class="regla">Solo fotos <b>puras de producto</b>: sin tickets, caras, dedos ni fondos con personas. Si está casi bien, <b>Recortar</b>. Al aprobar, la foto se reconstruye sin metadatos (EXIF/GPS) y se sustituye el archivo.</div>' : ''}
+    ${items.length && tab !== 'reportes' ? `<div class="row"><button class="ok" id="allok">Aprobar todo lo visible (${items.length})</button></div>` : ''}
+    ${cards || '<div class="empty">Nada pendiente 🎉</div>'}</main>`;
+  $('#out').onclick = logout;
+  $('#t1').onclick = () => { tab = 'fotos'; cargar(); };
+  $('#t2').onclick = () => { tab = 'productos'; cargar(); };
+  $('#t3').onclick = () => { tab = 'reportes'; cargar(); };
+  document.querySelectorAll('[data-a]').forEach(b => b.onclick = () => accion(b));
+  const all = $('#allok');
+  if (all) all.onclick = async () => {
+    if (!confirm(`¿Aprobar las ${items.length} entradas visibles?`)) return;
+    all.disabled = true; let fallos = 0;
+    for (const it of items) { const ok = await resolver(it, 'approved'); if (!ok) fallos++; }
+    if (fallos) alert(`${fallos} no se pudieron aprobar (se dejan pendientes).`);
+    cargar();
+  };
+}
+
+// aprobar una foto = reconstruirla sin metadatos y aprobarla en la misma petición
+async function resolver(it, status, note) {
+  if (tab === 'fotos') {
+    if (status === 'approved') {
+      try { const blob = await aJpeg(await cargarBitmap(fotoUrl(it))); const r = await reemplazarFoto(it, blob, 'approved'); return r.status === 200; }
+      catch (e) { return false; }
+    }
+    const r = await reemplazarFileless(it, status, note); return r;
+  }
+  const body = { status }; if (note) body.note = note;
+  return (await api(`/api/collections/productos/records/${it.id}`, { method: 'PATCH', body })).status === 200;
+}
+async function reemplazarFileless(it, status, note) {
+  const body = { status }; if (note) body.note = note;
+  return (await api(`/api/collections/fotos/records/${it.id}`, { method: 'PATCH', body })).status === 200;
+}
+
+async function accion(b) {
+  const id = b.dataset.id, a = b.dataset.a;
+  const it = items.find(x => x.id === id);
+  if (a === 'crop') {
+    const r = await recortar(it); if (!r) return;
+    const x = await reemplazarFoto(it, r.blob, r.aprobar ? 'approved' : null);
+    if (x.status !== 200) return alert('No se pudo guardar: ' + (x.data.message || x.status));
+    return cargar();
+  }
+  if (a === 'retirar') {
+    const nota = prompt('Motivo (opcional):') ?? null; if (nota === null) return;
+    if (b.dataset.foto) await api(`/api/collections/fotos/records/${b.dataset.foto}`, { method: 'PATCH', body: { status: 'rejected', note: nota } });
+    await api(`/api/collections/reportes/records/${id}`, { method: 'PATCH', body: { status: 'resolved' } });
+    return cargar();
+  }
+  if (a === 'dismissed') {
+    await api(`/api/collections/reportes/records/${id}`, { method: 'PATCH', body: { status: 'dismissed' } });
+    return cargar();
+  }
+  let note = '';
+  if (a === 'rejected') { note = prompt('Motivo del rechazo (opcional):') ?? null; if (note === null) return; }
+  const ok = await resolver(it, a, note);
+  if (!ok) return alert('No se pudo guardar (si es una foto, comprueba que se puede leer).');
+  cargar();
+}
+
+token ? cargar().catch(() => loginView()) : loginView();
+</script>
+</body>
+</html>
