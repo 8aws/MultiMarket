@@ -242,6 +242,21 @@ class AppDrawer extends StatelessWidget {
               },
             ),
             ListTile(
+              leading: const Icon(Icons.card_membership),
+              title: const Text('Tarjetas de fidelidad (Loywallet)'),
+              subtitle: const Text('Abre la app o te lleva a descargarla'),
+              onTap: () {
+                Navigator.pop(context);
+                // Sin esquema propio en Loywallet, la ficha de la App Store muestra «Abrir» si está instalada
+                launchUrl(
+                  Uri.parse(
+                    'https://apps.apple.com/es/app/loywallet/id6761814853',
+                  ),
+                  mode: LaunchMode.externalApplication,
+                );
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.receipt_long),
               title: const Text('Importar ticket'),
               onTap: () {

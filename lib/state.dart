@@ -96,6 +96,9 @@ class AppState extends ChangeNotifier {
   /// Fotos propias (solo en este dispositivo): clave de producto → ruta del archivo.
   final Map<String, String> fotosLocales = {};
 
+  /// Última foto enlazada (Open Food Facts o comunidad) de cada producto: permite recuperarla desde el historial.
+  final Map<String, String> imagenesUrl = {};
+
   /// Ofertas temporales anotadas a mano: 'productKey|cadena'.
 
   // ----- temporizador de frío
@@ -163,6 +166,10 @@ class AppState extends ChangeNotifier {
       frioManual.addAll(
         (jsonDecode(_prefs.getString('frioManual') ?? '{}') as Map)
             .cast<String, bool>(),
+      );
+      imagenesUrl.addAll(
+        (jsonDecode(_prefs.getString('imagenesUrl') ?? '{}') as Map)
+            .cast<String, String>(),
       );
       fotosLocales.addAll(
         (jsonDecode(_prefs.getString('fotosLocales') ?? '{}') as Map)
@@ -246,6 +253,7 @@ class AppState extends ChangeNotifier {
       );
     }
     _prefs.setString('fotosLocales', jsonEncode(fotosLocales));
+    _prefs.setString('imagenesUrl', jsonEncode(imagenesUrl));
     _prefs.setString(
       'hogares',
       jsonEncode(hogares.map((h) => h.toJson()).toList()),
@@ -820,6 +828,7 @@ class AppState extends ChangeNotifier {
       localImage: fotosLocales[p.key],
     );
     items.add(it);
+    if (it.imageUrl != null) imagenesUrl[p.key] = it.imageUrl!;
     changed();
     if (it.imageUrl == null && it.localImage == null) buscarFotoComunidad(it);
     return it;
@@ -1173,6 +1182,7 @@ class AppState extends ChangeNotifier {
   void _registrarCompra(Item it) {
     final p = productOf(it);
     final st = storeById(it.storeId);
+    if (it.imageUrl != null) imagenesUrl[p.key] = it.imageUrl!;
     compras.add(
       Compra(
         id: PbApi.randomId(),
@@ -1219,6 +1229,7 @@ class AppState extends ChangeNotifier {
         name: sg.name,
         barcode: esCodigo ? sg.key : null,
         cold: frioManual[sg.key] ?? looksCold(sg.name),
+        imageUrl: imagenesUrl[sg.key],
       ),
     );
     if (sg.storeId != null && storeById(sg.storeId) != null) {
@@ -1243,6 +1254,7 @@ class AppState extends ChangeNotifier {
         name: c.name,
         barcode: esCodigo ? c.key : null,
         cold: frioManual[c.key] ?? looksCold(c.name),
+        imageUrl: imagenesUrl[c.key],
       ),
     );
     it.cantidad = c.qty;
@@ -1320,6 +1332,19 @@ class AppState extends ChangeNotifier {
         changed();
       }
     } catch (_) {}
+    // sin foto de la comunidad: la de Open Food Facts por código de barras (p. ej. al recuperar del historial)
+    final code = it.barcode;
+    if (it.imageUrl == null && code != null && items.contains(it)) {
+      try {
+        final p = await productByBarcode(code);
+        final u = p?.imageUrl;
+        if (u != null && u.isNotEmpty && it.imageUrl == null) {
+          it.imageUrl = u;
+          imagenesUrl[productOf(it).key] = u;
+          changed();
+        }
+      } catch (_) {}
+    }
   }
 
   /// Foto propia de un producto (solo en este dispositivo). `path` null = quitarla.

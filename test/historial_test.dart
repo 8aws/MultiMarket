@@ -11,6 +11,7 @@ Future<AppState> mk([Map<String, Object> init = const {}]) async {
 void main() {
   deteccionTiendaTests();
   recompraDesdeHistorialTests();
+  recompraImagenTests();
   test('marcar comprado registra la compra; desmarcar la retira', () async {
     final s = await mk();
     final it = s.add(const Product(name: 'Leche', barcode: '8480000106483'));
@@ -144,4 +145,25 @@ void recompraDesdeHistorialTests() {
     });
     s.dispose();
   });
+}
+
+void recompraImagenTests() {
+  test(
+    'al recomprar se recupera la foto enlazada que tenía el producto',
+    () async {
+      final s = await mk();
+      final it = s.add(
+        const Product(
+          name: 'Leche',
+          barcode: '8480000106483',
+          imageUrl: 'https://img.example/leche.jpg',
+        ),
+      );
+      s.toggleDone(it);
+      s.items.clear(); // la compra ya se limpió de la lista
+      final otra = s.recomprar(s.compras.single)!;
+      expect(otra.imageUrl, 'https://img.example/leche.jpg');
+      s.dispose();
+    },
+  );
 }
