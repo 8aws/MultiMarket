@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'demo_capturas.dart';
 import 'notifier.dart';
 import 'state.dart';
 import 'ui/home.dart';
@@ -10,7 +11,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Notifier.init();
   final prefs = await SharedPreferences.getInstance();
-  runApp(MultiMarketApp(AppState(prefs)));
+  final state = AppState(prefs);
+  if (capturasActivas) await sembrarCapturas(state);
+  runApp(MultiMarketApp(state));
 }
 
 class AppScope extends InheritedNotifier<AppState> {

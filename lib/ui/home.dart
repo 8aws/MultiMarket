@@ -165,6 +165,9 @@ class _HomePageState extends State<HomePage> {
 }
 
 // ============================================================== MENÚ LATERAL
+/// El importador de tickets está terminado pero se publicará en una versión futura.
+const mostrarImportarTicket = false;
+
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
 
@@ -256,14 +259,16 @@ class AppDrawer extends StatelessWidget {
                 );
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.receipt_long),
-              title: const Text('Importar ticket'),
-              onTap: () {
-                Navigator.pop(context);
-                abrirImportarTicket(context);
-              },
-            ),
+            // Importar tickets (OCR): listo en el código pero oculto hasta una versión futura
+            if (mostrarImportarTicket)
+              ListTile(
+                leading: const Icon(Icons.receipt_long),
+                title: const Text('Importar ticket'),
+                onTap: () {
+                  Navigator.pop(context);
+                  abrirImportarTicket(context);
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.history),
               title: const Text('Historial de compras'),
