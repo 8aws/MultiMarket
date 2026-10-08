@@ -352,6 +352,39 @@ class PbApi {
   }
 
   /// Propone un producto nuevo a la base general. Queda pendiente de moderación.
+  /// Copia de la lista privada de esta cuenta (null si no hay).
+  Future<Map<String, dynamic>?> copiaActual() async {
+    await ensureAuth();
+    final r = await call(
+      'GET',
+      '/api/collections/copias/records',
+      query: {'perPage': '1'},
+    );
+    final l = r['items'] as List;
+    return l.isEmpty ? (null) : (l.first as Map).cast<String, dynamic>();
+  }
+
+  Future<void> guardarCopia(Map<String, dynamic> datos, String version) async {
+    final actual = await copiaActual();
+    final body = {'datos': datos, 'version': version};
+    if (actual == null) {
+      await call('POST', '/api/collections/copias/records', body: body);
+    } else {
+      await call(
+        'PATCH',
+        '/api/collections/copias/records/${actual['id']}',
+        body: body,
+      );
+    }
+  }
+
+  Future<void> borrarCopia() async {
+    final actual = await copiaActual();
+    if (actual != null) {
+      await call('DELETE', '/api/collections/copias/records/${actual['id']}');
+    }
+  }
+
   /// Informe de error anónimo (solo si el usuario lo ha activado en Ajustes).
   Future<void> enviarError(Map<String, dynamic> informe) async {
     await ensureAuth();

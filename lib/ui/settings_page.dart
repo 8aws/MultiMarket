@@ -604,6 +604,24 @@ class SettingsPage extends StatelessWidget {
           child: Column(
             children: [
               SwitchListTile(
+                title: const Text('Copia de mi lista privada en el servidor'),
+                subtitle: Text(
+                  c.copiaPrivada
+                      ? 'Si reinstalas la app podrás recuperar tu lista, historial y precios.${s.ultimaCopia == null ? '' : ' Última copia: ${s.ultimaCopia!.day}/${s.ultimaCopia!.month}/${s.ultimaCopia!.year}'}'
+                      : 'Opcional. Guarda tu lista privada, historial y precios en tu cuenta anónima del servidor; solo tú puedes verla. Desactivado por defecto',
+                ),
+                value: c.copiaPrivada,
+                onChanged: (v) async {
+                  c.copiaPrivada = v;
+                  s.changed();
+                  if (v) {
+                    await s.subirCopia(forzar: true);
+                  } else {
+                    await s.borrarCopiaServidor();
+                  }
+                },
+              ),
+              SwitchListTile(
                 title: const Text('Enviar informes de errores'),
                 subtitle: const Text(
                   'Anónimos: versión, sistema y traza del fallo, sin el contenido de tus listas. Ayudan a corregir errores. Desactivado por defecto',

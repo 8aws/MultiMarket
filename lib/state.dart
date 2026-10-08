@@ -24,6 +24,7 @@ class AppState extends ChangeNotifier {
     sync.iniciar();
     unawaited(recuperarListas());
     unawaited(refrescarSancion());
+    unawaited(consultarCopia());
   }
 
   final SharedPreferences _prefs;
@@ -237,6 +238,7 @@ class AppState extends ChangeNotifier {
   }
 
   void _save() {
+    _programarCopia();
     _prefs.setString('cfg', jsonEncode(cfg.toJson()));
     _prefs.setString('exclusivos', jsonEncode(exclusivos));
     _prefs.setString('frioManual', jsonEncode(frioManual));
@@ -374,6 +376,141 @@ class AppState extends ChangeNotifier {
 
   /// Si esta cuenta de dispositivo (guardada en el llavero) ya es miembro de listas del servidor que no están en
   /// este dispositivo (reinstalación, datos borrados), las vuelve a añadir. Devuelve cuántas recuperó.
+  // ------------------------------------------ copia de la lista privada
+  /// Fecha de la copia del servidor si este dispositivo está «vacío» y hay algo que restaurar (se ofrece al usuario).
+  DateTime? copiaParaRestaurar;
+  Timer? _copiaTimer;
+  String _copiaHash = '';
+
+  Map<String, dynamic> _datosCopia() {
+    List<dynamic> lista(String k) =>
+        jsonDecode(_prefs.getString(k) ?? '[]') as List;
+    final items = [
+      for (final i in lista('items:${Hogar.privadaId}'))
+        {...(i as Map).cast<String, dynamic>()..remove('localImage')},
+    ];
+    var compras = lista('compras:${Hogar.privadaId}');
+    if (compras.length > 4000) compras = compras.sublist(compras.length - 4000);
+    return {
+      'items': items,
+      'offers': lista('offers:${Hogar.privadaId}'),
+      'compras': compras,
+      'recompra': jsonDecode(
+        _prefs.getString('recompra:${Hogar.privadaId}') ?? '{}',
+      ),
+      'exclusivos': exclusivos,
+      'frioManual': frioManual,
+      'aliasTicket': aliasTicket,
+      'local': jsonDecode(_prefs.getString('local') ?? '{}'),
+      'imagenesUrl': imagenesUrl,
+    };
+  }
+
+  bool get _privadaVacia =>
+      (_lists[Hogar.privadaId] ?? const []).isEmpty &&
+      (_compras[Hogar.privadaId] ?? const []).isEmpty;
+
+  void _programarCopia() {
+    if (!cfg.copiaPrivada) return;
+    _copiaTimer?.cancel();
+    _copiaTimer = Timer(
+      const Duration(seconds: 90),
+      () => unawaited(subirCopia()),
+    );
+  }
+
+  /// Sube la copia de la lista privada (solo si el usuario la activó y hubo cambios).
+  Future<void> subirCopia({bool forzar = false}) async {
+    if (!cfg.copiaPrivada) return;
+    try {
+      final datos = _datosCopia();
+      final h = jsonEncode(datos).hashCode.toString();
+      if (!forzar && h == _copiaHash) return;
+      await sync.api.ensureAuth(alias: cfg.alias);
+      await sync.api.guardarCopia(datos, versionApp);
+      _copiaHash = h;
+      _prefs.setString('copiaFecha', DateTime.now().toIso8601String());
+    } catch (_) {} // sin red: se reintenta con el siguiente cambio
+  }
+
+  DateTime? get ultimaCopia =>
+      DateTime.tryParse(_prefs.getString('copiaFecha') ?? '');
+
+  /// Mira si hay copia en el servidor y este dispositivo está vacío: entonces se ofrece restaurarla.
+  Future<void> consultarCopia() async {
+    try {
+      if (!await sync.api.tieneCuenta || !_privadaVacia) return;
+      final c = await sync.api.copiaActual();
+      if (c == null) return;
+      final d = (c['datos'] as Map?) ?? const {};
+      if (((d['items'] as List?)?.isEmpty ?? true) &&
+          ((d['compras'] as List?)?.isEmpty ?? true)) {
+        return;
+      }
+      copiaParaRestaurar =
+          DateTime.tryParse(
+            '${c['updated']}'.replaceFirst(' ', 'T'),
+          )?.toLocal() ??
+          DateTime.now();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// Restaura la lista privada desde la copia del servidor. Devuelve un mensaje de error o null si fue bien.
+  Future<String?> restaurarCopia() async {
+    try {
+      final c = await sync.api.copiaActual();
+      if (c == null) return 'No hay copia en el servidor';
+      final d = (c['datos'] as Map).cast<String, dynamic>();
+      void guarda(String k, Object? v) => _prefs.setString(k, jsonEncode(v));
+      guarda('items:${Hogar.privadaId}', d['items'] ?? []);
+      guarda('offers:${Hogar.privadaId}', d['offers'] ?? []);
+      guarda('compras:${Hogar.privadaId}', d['compras'] ?? []);
+      guarda('recompra:${Hogar.privadaId}', d['recompra'] ?? {});
+      for (final k in [
+        'exclusivos',
+        'frioManual',
+        'aliasTicket',
+        'imagenesUrl',
+      ]) {
+        final actual = jsonDecode(_prefs.getString(k) ?? '{}') as Map;
+        guarda(k, {...((d[k] as Map?) ?? {}), ...actual});
+      }
+      final loc = jsonDecode(_prefs.getString('local') ?? '{}') as Map;
+      guarda('local', {...((d['local'] as Map?) ?? {}), ...loc});
+      for (final m in [
+        exclusivos,
+        frioManual,
+        aliasTicket,
+        imagenesUrl,
+        _local,
+      ]) {
+        m.clear();
+      }
+      _lists.clear();
+      _compras.clear();
+      _descartes.clear();
+      _offers.clear();
+      _load();
+      copiaParaRestaurar = null;
+      changed();
+      return null;
+    } on PbException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'No se pudo restaurar la copia';
+    }
+  }
+
+  /// Borra la copia del servidor (al desactivar la opción).
+  Future<void> borrarCopiaServidor() async {
+    try {
+      await sync.api.borrarCopia();
+      _prefs.remove('copiaFecha');
+      _copiaHash = '';
+    } catch (_) {}
+  }
+
   // ------------------------------------------------------ informes de errores
   /// Cola de informes pendientes de enviar (máx. 10, sin repetidos). Solo se llena si el usuario activó los informes.
   final List<Map<String, dynamic>> _erroresPend = [];

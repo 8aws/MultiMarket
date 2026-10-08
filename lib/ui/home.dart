@@ -297,6 +297,49 @@ class ListPage extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 88), // hueco para el «+»
       children: [
         const SyncBanner(),
+        if (s.copiaParaRestaurar != null)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hay una copia de tu lista privada del ${s.copiaParaRestaurar!.day}/${s.copiaParaRestaurar!.month}/${s.copiaParaRestaurar!.year}. ¿Quieres recuperarla?',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      FilledButton(
+                        onPressed: () async {
+                          final e = await s.restaurarCopia();
+                          if (e != null && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(e),
+                                showCloseIcon: true,
+                                persist: false,
+                              ),
+                            );
+                          }
+                        },
+                        child: const Text('Recuperar'),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () {
+                          s.copiaParaRestaurar = null;
+                          s.changed();
+                        },
+                        child: const Text('Ahora no'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
         if (!s.puedeCompartir)
           Card(
             color: Theme.of(context).colorScheme.errorContainer,

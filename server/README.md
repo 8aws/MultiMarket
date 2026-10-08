@@ -18,6 +18,7 @@ Infraestructura propia (ver el README privado del servidor). Aquí solo viven la
 El superusuario usa contraseña + OTP por correo: los scripts ya no pueden entrar solos.
 Para tareas de admin usar el panel o la CLI del contenedor
 (`docker exec multimarket-pb /usr/local/bin/pocketbase ... --dir=/pb_data`).
+Copias: PocketBase hace una copia diaria (04:00, conserva 7) y un NAS con RAID1 la descarga cada día (07:15) y conserva 30 días; el detalle del acceso vive en la infraestructura privada. **No desactivar el backup automático de PocketBase.**
 Backups: panel → *Settings → Backups* (o `POST /api/backups` con sesión de superusuario).
 
 ## Desplegar

@@ -442,6 +442,7 @@ class Settings {
     this.detectarTienda = true,
     this.recompra = true,
     this.enviarErrores = false,
+    this.copiaPrivada = false,
   }) : enabled = enabled ?? {},
        favChains = favChains ?? {};
 
@@ -461,6 +462,8 @@ class Settings {
   sharePhotos; // true = compartir fotos sin preguntar; false = preguntar cada vez
   bool
   enviarErrores; // informes de errores anónimos al servidor (desactivado por defecto)
+  bool
+  copiaPrivada; // copia de la lista privada en el servidor (opcional, desactivada por defecto)
   bool recompra; // sugerencias «fantasma» de reposición según tu historial
   bool
   detectarTienda; // al marcar comprado, usa la ubicación para saber en qué tienda estás
@@ -489,6 +492,7 @@ class Settings {
     'detectarTienda': detectarTienda,
     'recompra': recompra,
     'enviarErrores': enviarErrores,
+    'copiaPrivada': copiaPrivada,
   };
 
   factory Settings.fromJson(Map<String, dynamic> j) => Settings(
@@ -511,6 +515,7 @@ class Settings {
     detectarTienda: j['detectarTienda'] ?? true,
     recompra: j['recompra'] ?? true,
     enviarErrores: j['enviarErrores'] ?? false,
+    copiaPrivada: j['copiaPrivada'] ?? false,
   );
 }
 
