@@ -23,6 +23,7 @@ class AppState extends ChangeNotifier {
     sync.addListener(refresh); // estado de la sincronización → repintar
     sync.iniciar();
     unawaited(recuperarListas());
+    unawaited(refrescarSancion());
   }
 
   final SharedPreferences _prefs;
@@ -195,6 +196,9 @@ class AppState extends ChangeNotifier {
                   e.key: Descarte.fromJson(e.value as Map<String, dynamic>),
               };
       }
+      final sn = jsonDecode(_prefs.getString('sancion') ?? '{}') as Map;
+      sancionIndef = sn['indef'] == true;
+      sancionHasta = DateTime.tryParse('${sn['hasta'] ?? ''}');
       aliasTicket.addAll(
         (jsonDecode(_prefs.getString('aliasTicket') ?? '{}') as Map)
             .cast<String, String>(),
@@ -370,6 +374,42 @@ class AppState extends ChangeNotifier {
 
   /// Si esta cuenta de dispositivo (guardada en el llavero) ya es miembro de listas del servidor que no están en
   /// este dispositivo (reinstalación, datos borrados), las vuelve a añadir. Devuelve cuántas recuperó.
+  // ------------------------------------------------------------- sanciones
+  /// Si el administrador ha sancionado la cuenta por contenido inadecuado: sigue usando la app y la base común,
+  /// pero no puede subir fotos ni proponer productos.
+  DateTime? sancionHasta;
+  bool sancionIndef = false;
+
+  bool get puedeCompartir =>
+      !sancionIndef &&
+      (sancionHasta == null || !sancionHasta!.isAfter(DateTime.now()));
+
+  String? get textoSancion => puedeCompartir
+      ? null
+      : (sancionIndef
+            ? 'Tu cuenta no puede compartir contenido nuevo. Puedes seguir usando la app y consultar la base común.'
+            : 'Tu cuenta no puede compartir contenido hasta el ${sancionHasta!.day}/${sancionHasta!.month}/${sancionHasta!.year}. Puedes seguir usando la app y consultar la base común.');
+
+  Future<void> refrescarSancion() async {
+    try {
+      if (!await sync.api.tieneCuenta) return;
+      final u = await sync.api.miUsuario();
+      sancionIndef = u['sancion_indef'] == true;
+      final h = DateTime.tryParse(
+        '${u['sancion_hasta'] ?? ''}'.replaceFirst(' ', 'T'),
+      );
+      sancionHasta = h?.toLocal();
+      _prefs.setString(
+        'sancion',
+        jsonEncode({
+          'indef': sancionIndef,
+          'hasta': sancionHasta?.toIso8601String(),
+        }),
+      );
+      changed();
+    } catch (_) {} // sin red: se conserva lo último que se supo
+  }
+
   String diagnosticoRecuperar = '';
 
   Future<int> recuperarListas() async {
@@ -1364,7 +1404,11 @@ class AppState extends ChangeNotifier {
   /// Propone un producto NUEVO a la base general (queda pendiente de moderación).
   /// Falla en silencio si no hay conexión: el producto sigue en la lista del usuario.
   Future<void> proponerProducto(Product p) async {
-    if (!cfg.shareNewProducts || proponidos.contains(p.key)) return;
+    if (!cfg.shareNewProducts ||
+        !puedeCompartir ||
+        proponidos.contains(p.key)) {
+      return;
+    }
     try {
       await sync.api.proponerProducto(p);
       proponidos.add(p.key);

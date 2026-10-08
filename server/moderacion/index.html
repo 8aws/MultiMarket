@@ -201,7 +201,7 @@ async function cargar() {
 }
 
 function botones(id, extra = '') {
-  return `<div class="row"><button class="ok" data-a="approved" data-id="${id}">Aprobar</button>${extra}<button class="bad" data-a="rejected" data-id="${id}">Rechazar</button></div>`;
+  return `<div class="row"><button class="ok" data-a="approved" data-id="${id}">Aprobar</button>${extra}<button class="bad" data-a="rejected" data-id="${id}">Rechazar</button><button class="bad" data-a="rejsanc" data-id="${id}" title="Rechaza y sanciona al autor: 7 días, 30 días, indefinida">Rechazar y sancionar</button></div>`;
 }
 function pintar(cnt) {
   let cards = '';
@@ -276,6 +276,18 @@ async function accion(b) {
   }
   if (a === 'dismissed') {
     await api(`/api/collections/reportes/records/${id}`, { method: 'PATCH', body: { status: 'dismissed' } });
+    return cargar();
+  }
+  if (a === 'rejsanc') {
+    if (!it.owner) return alert('Este contenido no tiene autor (cuenta borrada): solo se puede rechazar.');
+    const motivo = prompt('Motivo (se guarda en el registro y se muestra como motivo del rechazo):'); if (motivo === null) return;
+    if (!confirm('Se rechazará y se sancionará al autor (el escalado es automático: 7 días, 30 días, indefinida). ¿Seguro?')) return;
+    const ok2 = await resolver(it, 'rejected', motivo);
+    if (!ok2) return alert('No se pudo rechazar.');
+    const r = await api('/api/mm/sancionar', { method: 'POST', body: { user: it.owner, motivo } });
+    alert(r.status === 200
+      ? `Autor sancionado (nivel ${r.data.nivel}): ${r.data.indefinida ? 'indefinida' : 'hasta ' + String(r.data.hasta).slice(0, 10)}`
+      : 'Rechazado, pero no se pudo sancionar: ' + (r.data.message || r.status));
     return cargar();
   }
   let note = '';

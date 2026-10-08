@@ -352,6 +352,12 @@ class PbApi {
   }
 
   /// Propone un producto nuevo a la base general. Queda pendiente de moderación.
+  /// Registro de esta cuenta (incluye si tiene una sanción activa para compartir contenido).
+  Future<Map<String, dynamic>> miUsuario() async {
+    await ensureAuth();
+    return call('GET', '/api/collections/users/records/$userId');
+  }
+
   Future<void> proponerProducto(Product p) async {
     final partes = p.name.split(' · ');
     await call(

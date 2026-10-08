@@ -297,6 +297,25 @@ class ListPage extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 88), // hueco para el «+»
       children: [
         const SyncBanner(),
+        if (!s.puedeCompartir)
+          Card(
+            color: Theme.of(context).colorScheme.errorContainer,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  const Icon(Icons.block, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      s.textoSancion!,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         if (s.cfg.showColdCard) const ColdBanner(),
         const ExpiringOffersBanner(),
         if (s.cfg.showCartCard) const CartCard(),

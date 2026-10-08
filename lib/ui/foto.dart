@@ -211,6 +211,20 @@ Future<void> aniadirFoto(
   s.setFotoLocal(it, destino);
   if (!context.mounted) return;
 
+  if (!s.puedeCompartir) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${s.textoSancion}\nLa foto se queda solo en tu móvil.',
+          ),
+          showCloseIcon: true,
+          persist: false,
+        ),
+      );
+    }
+    return;
+  }
   var compartir = s.cfg.sharePhotos;
   if (!compartir) {
     final r = await showDialog<bool>(
@@ -224,7 +238,7 @@ Future<void> aniadirFoto(
           '• se revisará antes de publicarse y no podrás editarla,\n'
           '• mientras esté pendiente puedes retirarla, pero una vez aprobada será permanente en la base común.\n\n'
           'Solo se aceptan fotos PURAS del producto: el envase, sin tickets, caras, dedos ni personas al fondo, '
-          'y hechas por ti. Si está casi bien, se recorta al revisarla. '
+          'y hechas por ti. Si está casi bien, se ajusta al revisarla. '
           'Se eliminan todos los metadatos (ubicación, fecha, modelo del móvil) de la foto.\n\n'
           'Puedes elegir no compartirla y seguir viéndola solo tú.',
         ),
@@ -260,6 +274,7 @@ Future<void> aniadirFoto(
       );
     }
   } on PbException catch (e) {
+    if (e.status == 403) s.refrescarSancion();
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

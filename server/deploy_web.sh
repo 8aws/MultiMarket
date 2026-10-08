@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 . server/lib_config.sh
 flutter build web --release
-for d in moderacion privacidad privacy; do
-  mkdir -p "build/web/$d"; cp "server/$d/index.html" "build/web/$d/index.html"
+for d in moderacion privacidad privacy info; do
+  mkdir -p "build/web/$d"; cp server/$d/* "build/web/$d/"
 done
 rsync -av --delete build/web/ "$MM_SSH:$MM_REMOTE_DIR/pb_public/"

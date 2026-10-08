@@ -10,6 +10,7 @@ String ahora([int minutosAtras = 0]) => DateTime.now()
     .replaceFirst('T', ' ');
 
 void main() {
+  sancionesTests();
   test(
     'un aviso de otro miembro se muestra; los míos, ajenos o viejos no',
     () async {
@@ -60,4 +61,25 @@ void main() {
     expect(await s.voyYo(), 'Solo en listas compartidas');
     s.dispose();
   });
+}
+
+void sancionesTests() {
+  test(
+    'una sanción temporal bloquea hasta su fecha; la indefinida, siempre',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final s = AppState(await SharedPreferences.getInstance());
+      expect(s.puedeCompartir, isTrue);
+      expect(s.textoSancion, isNull);
+      s.sancionHasta = DateTime.now().add(const Duration(days: 7));
+      expect(s.puedeCompartir, isFalse);
+      expect(s.textoSancion, contains('hasta el'));
+      s.sancionHasta = DateTime.now().subtract(const Duration(days: 1));
+      expect(s.puedeCompartir, isTrue, reason: 'la sanción caducó');
+      s.sancionIndef = true;
+      expect(s.puedeCompartir, isFalse);
+      expect(s.textoSancion, contains('no puede compartir contenido nuevo'));
+      s.dispose();
+    },
+  );
 }
