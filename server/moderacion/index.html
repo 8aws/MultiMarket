@@ -123,20 +123,30 @@ async function reemplazarFoto(f, blob, estado, nota) {
   return { status: r.status, data: d };
 }
 
-// recorte: arrastrar para dibujar el rectángulo sobre la foto
+// ajuste (girar y recortar): arrastrar para dibujar el rectángulo sobre la foto
 function recortar(f) {
   return new Promise(async resolve => {
     let bmp; try { bmp = await cargarBitmap(fotoUrl(f)); } catch (e) { alert(e.message); return resolve(null); }
     const ov = document.createElement('div'); ov.id = 'crop';
-    ov.innerHTML = `<div style="color:#fff;font-size:14px">Arrastra sobre la foto para elegir la zona. Se recorta con pérdida y se elimina la original.</div>
+    ov.innerHTML = `<div style="color:#fff;font-size:14px">Gira la foto si hace falta y arrastra sobre ella para elegir la zona. Se ajusta con pérdida y se elimina la original.</div>
       <canvas></canvas>
+       <div class="row"><button id="g-izq" title="Girar a la izquierda">↺ Girar</button><button id="g-der" title="Girar a la derecha">↻ Girar</button></div>
       <label><input type="checkbox" id="sq" style="width:auto;margin:0 6px 0 0" checked>Mantener cuadrado</label>
-      <div class="row"><button class="ok" id="c-ok">Recortar y aprobar</button><button id="c-solo">Recortar (dejar pendiente)</button><button id="c-no">Cancelar</button></div>`;
+      <div class="row"><button class="ok" id="c-ok">Ajustar y aprobar</button><button id="c-solo">Ajustar (dejar pendiente)</button><button id="c-no">Cancelar</button></div>`;
     document.body.appendChild(ov);
     const cv = $('canvas', ov), ctx = cv.getContext('2d');
-    const esc2 = Math.min(1, 900 / Math.max(bmp.width, bmp.height));
+    let esc2 = Math.min(1, 900 / Math.max(bmp.width, bmp.height));
     cv.width = Math.round(bmp.width * esc2); cv.height = Math.round(bmp.height * esc2);
     let sel = { x: 0, y: 0, w: cv.width, h: cv.height }, ini = null;
+    // girar 90° (dir = 1 horario, -1 antihorario): la foto girada pasa a ser la que se recorta y se guarda
+    const girar = dir => {
+      const c = document.createElement('canvas'); c.width = bmp.height; c.height = bmp.width;
+      const g = c.getContext('2d'); g.translate(c.width / 2, c.height / 2); g.rotate(dir * Math.PI / 2);
+      g.drawImage(bmp, -bmp.width / 2, -bmp.height / 2);
+      bmp = c; esc2 = Math.min(1, 900 / Math.max(bmp.width, bmp.height));
+      cv.width = Math.round(bmp.width * esc2); cv.height = Math.round(bmp.height * esc2);
+      sel = { x: 0, y: 0, w: cv.width, h: cv.height }; pintar();
+    };
     const pintar = () => {
       ctx.drawImage(bmp, 0, 0, cv.width, cv.height);
       ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(0, 0, cv.width, cv.height);
@@ -156,9 +166,11 @@ function recortar(f) {
     };
     cv.onpointerup = () => { ini = null; };
     pintar();
+    $('#g-izq', ov).onclick = () => girar(-1);
+    $('#g-der', ov).onclick = () => girar(1);
     const fin = v => { ov.remove(); resolve(v); };
     const rect = () => { const r = { x: Math.round(sel.x / esc2), y: Math.round(sel.y / esc2), w: Math.max(8, Math.round(sel.w / esc2)), h: Math.max(8, Math.round(sel.h / esc2)) }; return Object.values(r).every(Number.isFinite) ? r : null; };
-    const hacer = aprobar => async () => { try { fin({ blob: await aJpeg(bmp, rect()), aprobar }); } catch (e) { alert('No se pudo recortar: ' + e.message); } };
+    const hacer = aprobar => async () => { try { fin({ blob: await aJpeg(bmp, rect()), aprobar }); } catch (e) { alert('No se pudo ajustar la foto: ' + e.message); } };
     $('#c-ok', ov).onclick = hacer(true);
     $('#c-solo', ov).onclick = hacer(false);
     $('#c-no', ov).onclick = () => fin(null);
@@ -197,7 +209,7 @@ function pintar(cnt) {
     <div class="card" data-id="${it.id}"><a href="${fotoUrl(it)}" target="_blank"><img src="${fotoUrl(it, true)}" alt=""></a>
       <div class="b"><h3>${esc(it.name || it.key)}</h3><div class="mut">clave: ${esc(it.key)}${it.barcode ? ' · código ' + esc(it.barcode) : ''}</div>
       <div class="mut">${esc((it.created || '').slice(0, 16))}</div>
-      ${botones(it.id, `<button data-a="crop" data-id="${it.id}">Recortar</button>`)}</div></div>`).join('');
+      ${botones(it.id, `<button data-a="crop" data-id="${it.id}">Ajustar</button>`)}</div></div>`).join('');
   else if (tab === 'productos') cards = items.map(it => `
     <div class="card" data-id="${it.id}">${it.image_url ? `<img src="${esc(it.image_url)}" alt="">` : ''}
       <div class="b"><h3>${esc(it.name)}</h3><div class="mut">${esc([it.brand, it.quantity].filter(Boolean).join(' · '))}</div>
@@ -212,7 +224,7 @@ function pintar(cnt) {
     <main><div class="tabs"><button id="t1" class="${tab === 'fotos' ? 'on' : ''}">Fotos (${cnt.fotos})</button>
     <button id="t2" class="${tab === 'productos' ? 'on' : ''}">Productos (${cnt.productos})</button>
     <button id="t3" class="${tab === 'reportes' ? 'on' : ''}">Reportes (${cnt.reportes})</button></div>
-    ${tab === 'fotos' ? '<div class="regla">Solo fotos <b>puras de producto</b>: sin tickets, caras, dedos ni fondos con personas. Si está casi bien, <b>Recortar</b>. Al aprobar, la foto se reconstruye sin metadatos (EXIF/GPS) y se sustituye el archivo.</div>' : ''}
+    ${tab === 'fotos' ? '<div class="regla">Solo fotos <b>puras de producto</b>: sin tickets, caras, dedos ni fondos con personas. Si está casi bien, <b>Ajustar</b> (girar y recortar). Al aprobar, la foto se reconstruye sin metadatos (EXIF/GPS) y se sustituye el archivo.</div>' : ''}
     ${items.length && tab !== 'reportes' ? `<div class="row"><button class="ok" id="allok">Aprobar todo lo visible (${items.length})</button></div>` : ''}
     ${cards || '<div class="empty">Nada pendiente 🎉</div>'}</main>`;
   $('#out').onclick = logout;

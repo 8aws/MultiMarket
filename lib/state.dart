@@ -1230,6 +1230,46 @@ class AppState extends ChangeNotifier {
     return it;
   }
 
+  /// Vuelve a poner en la lista un producto del historial (misma cantidad y, si la tienda sigue, su precio).
+  /// Devuelve null si ya está pendiente en la lista.
+  Item? recomprar(Compra c) {
+    final esCodigo = RegExp(r'^\d{8,14}$').hasMatch(c.key);
+    final yaEsta = items.any(
+      (i) => !i.done && (productOf(i).key == c.key || i.name == c.name),
+    );
+    if (yaEsta) return null;
+    final it = add(
+      Product(
+        name: c.name,
+        barcode: esCodigo ? c.key : null,
+        cold: frioManual[c.key] ?? looksCold(c.name),
+      ),
+    );
+    it.cantidad = c.qty;
+    if (c.storeId != null && storeById(c.storeId) != null) {
+      it.storeId = c.storeId;
+      it.price = c.price;
+    }
+    changed();
+    return it;
+  }
+
+  /// Repite una compra entera (todos los productos de un día); salta los que ya están pendientes.
+  int repetirCompra(List<Compra> dia) {
+    var n = 0;
+    for (final c in dia) {
+      if (recomprar(c) != null) n++;
+    }
+    if (n > 0) {
+      _avisos.add(
+        Aviso(
+          '$n producto${n == 1 ? '' : 's'} añadido${n == 1 ? '' : 's'} a la lista',
+        ),
+      );
+    }
+    return n;
+  }
+
   /// El usuario toca el círculo de una sugerencia: se quita sin contar como compra. Devuelve true si ya
   /// la ha descartado varias veces seguidas y conviene preguntarle qué quiere.
   bool descartarSugerencia(Sugerencia sg) {

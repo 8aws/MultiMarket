@@ -10,6 +10,7 @@ Future<AppState> mk([Map<String, Object> init = const {}]) async {
 
 void main() {
   deteccionTiendaTests();
+  recompraDesdeHistorialTests();
   test('marcar comprado registra la compra; desmarcar la retira', () async {
     final s = await mk();
     final it = s.add(const Product(name: 'Leche', barcode: '8480000106483'));
@@ -111,4 +112,36 @@ void deteccionTiendaTests() {
       s.dispose();
     },
   );
+}
+
+void recompraDesdeHistorialTests() {
+  test('recomprar desde el historial repone cantidad y no duplica', () async {
+    final s = await mk();
+    final it = s.add(const Product(name: 'Leche', barcode: '8480000106483'));
+    s.setCantidad(it, 3);
+    s.toggleDone(it);
+    final c = s.compras.single;
+    final otra = s.recomprar(c)!;
+    expect(otra.done, isFalse);
+    expect(otra.cantidad, 3);
+    expect(otra.barcode, '8480000106483');
+    expect(s.recomprar(c), isNull, reason: 'ya está pendiente');
+    expect(s.repetirCompra([c]), 0);
+    s.dispose();
+  });
+
+  test('repetir una compra añade solo lo que falta', () async {
+    final s = await mk();
+    final a = s.add(const Product(name: 'Pan'));
+    final b = s.add(const Product(name: 'Arroz'));
+    s.toggleDone(a);
+    s.toggleDone(b);
+    s.add(const Product(name: 'Pan')); // ya pendiente
+    expect(s.repetirCompra([...s.compras]), 1);
+    expect(s.items.where((i) => !i.done).map((i) => i.name).toSet(), {
+      'Pan',
+      'Arroz',
+    });
+    s.dispose();
+  });
 }

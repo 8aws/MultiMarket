@@ -774,6 +774,8 @@ class ItemRow extends StatelessWidget {
                   localImage: item.localImage,
                   imageUrl: item.imageUrl,
                   size: 36,
+                  ampliable: true,
+                  titulo: item.name,
                 ),
               ),
             Expanded(

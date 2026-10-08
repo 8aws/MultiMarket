@@ -91,6 +91,8 @@ class _FichaState extends State<_Ficha> {
                     child: ProductThumb(
                       localImage: it.localImage,
                       imageUrl: it.imageUrl,
+                      ampliable: true,
+                      titulo: it.name,
                       size: 64,
                     ),
                   ),

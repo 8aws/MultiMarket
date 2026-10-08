@@ -20,10 +20,16 @@ class ProductThumb extends StatelessWidget {
     this.localImage,
     this.imageUrl,
     this.size = 40,
+    this.ampliable = false,
+    this.titulo,
   });
   final String? localImage;
   final String? imageUrl;
   final double size;
+
+  /// Al pulsarla se abre ampliada (con zoom) para comprobar que es el producto que se busca.
+  final bool ampliable;
+  final String? titulo;
 
   bool get hay =>
       (localImage != null && !kIsWeb) ||
@@ -52,7 +58,20 @@ class ProductThumb extends StatelessWidget {
         loadingBuilder: (c, child, p) => p == null ? child : _vacio(cs),
       );
     }
-    return ClipRRect(borderRadius: BorderRadius.circular(8), child: img);
+    final miniatura = ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: img,
+    );
+    if (!ampliable) return miniatura;
+    return GestureDetector(
+      onTap: () => verFotoAmpliada(
+        context,
+        localImage: localImage,
+        imageUrl: imageUrl,
+        titulo: titulo,
+      ),
+      child: miniatura,
+    );
   }
 
   Widget _vacio(ColorScheme cs) => Container(
@@ -60,6 +79,69 @@ class ProductThumb extends StatelessWidget {
     height: size,
     color: cs.surfaceContainerHighest,
     child: Icon(Icons.image_outlined, size: size * .5, color: cs.outline),
+  );
+}
+
+/// Foto a pantalla casi completa, con zoom y desplazamiento. Se cierra pulsando fuera o con la cruz.
+Future<void> verFotoAmpliada(
+  BuildContext context, {
+  String? localImage,
+  String? imageUrl,
+  String? titulo,
+}) {
+  final Widget foto = localImage != null && !kIsWeb
+      ? Image.file(File(localImage), fit: BoxFit.contain)
+      : Image.network(
+          imageUrl ?? '',
+          fit: BoxFit.contain,
+          errorBuilder: (_, _, _) => const Padding(
+            padding: EdgeInsets.all(32),
+            child: Icon(Icons.broken_image_outlined, size: 64),
+          ),
+        );
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) => Dialog(
+      insetPadding: const EdgeInsets.all(12),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: InteractiveViewer(
+                  minScale: 1,
+                  maxScale: 5,
+                  child: Center(child: foto),
+                ),
+              ),
+              if (titulo != null && titulo.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    titulo,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: IconButton.filledTonal(
+              tooltip: 'Cerrar',
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ),
+        ],
+      ),
+    ),
   );
 }
 

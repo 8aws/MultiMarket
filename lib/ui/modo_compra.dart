@@ -372,7 +372,12 @@ class _ResultadoEscaneoState extends State<ResultadoEscaneo> {
                 if (p.imageUrl != null)
                   Padding(
                     padding: const EdgeInsets.only(right: 12),
-                    child: ProductThumb(imageUrl: p.imageUrl, size: 64),
+                    child: ProductThumb(
+                      imageUrl: p.imageUrl,
+                      size: 64,
+                      ampliable: true,
+                      titulo: p.name,
+                    ),
                   ),
                 Expanded(
                   child: Column(

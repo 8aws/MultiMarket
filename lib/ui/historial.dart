@@ -64,6 +64,25 @@ class HistorialPage extends StatelessWidget {
                   eur(e.value.fold(0.0, (t, c) => t + c.total)),
                   style: TextStyle(fontSize: 12, color: cs.outline),
                 ),
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  icon: const Icon(Icons.replay, size: 16),
+                  label: const Text('Repetir', style: TextStyle(fontSize: 12)),
+                  onPressed: () {
+                    if (s.repetirCompra(e.value) == 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Todo eso ya está en tu lista'),
+                          behavior: SnackBarBehavior.floating,
+                          showCloseIcon: true,
+                        ),
+                      );
+                    }
+                  },
+                ),
               ],
             ),
           ),
@@ -88,7 +107,41 @@ class HistorialPage extends StatelessWidget {
                                     : s.sync.aliasDe[c.by]!),
                       ].where((x) => x.isNotEmpty).join(' · '),
                     ),
-                    trailing: c.price == null ? null : Text(eur(c.total)),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (c.price != null) Text(eur(c.total)),
+                        IconButton(
+                          tooltip: 'Añadir otra vez a la lista',
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.add_shopping_cart, size: 20),
+                          onPressed: () {
+                            final it = s.recomprar(c);
+                            ScaffoldMessenger.of(context)
+                              ..clearSnackBars()
+                              ..showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    it == null
+                                        ? '«${c.name}» ya está en tu lista'
+                                        : 'Añadido: ${c.name}',
+                                  ),
+                                  behavior: SnackBarBehavior.floating,
+                                  showCloseIcon: true,
+                                  duration: const Duration(seconds: 4),
+                                  persist: false,
+                                  action: it == null
+                                      ? null
+                                      : SnackBarAction(
+                                          label: 'Deshacer',
+                                          onPressed: () => s.remove(it),
+                                        ),
+                                ),
+                              );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
               ],
             ),
