@@ -603,6 +603,17 @@ class SettingsPage extends StatelessWidget {
         Card(
           child: Column(
             children: [
+              SwitchListTile(
+                title: const Text('Enviar informes de errores'),
+                subtitle: const Text(
+                  'Anónimos: versión, sistema y traza del fallo, sin el contenido de tus listas. Ayudan a corregir errores. Desactivado por defecto',
+                ),
+                value: c.enviarErrores,
+                onChanged: (v) {
+                  c.enviarErrores = v;
+                  s.changed();
+                },
+              ),
               ListTile(
                 leading: const Icon(Icons.privacy_tip_outlined),
                 title: const Text('Política de privacidad'),

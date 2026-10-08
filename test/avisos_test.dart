@@ -11,6 +11,7 @@ String ahora([int minutosAtras = 0]) => DateTime.now()
 
 void main() {
   sancionesTests();
+  erroresTests();
   test(
     'un aviso de otro miembro se muestra; los míos, ajenos o viejos no',
     () async {
@@ -79,6 +80,22 @@ void sancionesTests() {
       s.sancionIndef = true;
       expect(s.puedeCompartir, isFalse);
       expect(s.textoSancion, contains('no puede compartir contenido nuevo'));
+      s.dispose();
+    },
+  );
+}
+
+void erroresTests() {
+  test(
+    'los errores solo se encolan si el usuario activó los informes',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final s = AppState(await SharedPreferences.getInstance());
+      expect(s.cfg.enviarErrores, isFalse, reason: 'desactivado por defecto');
+      s.registrarError(
+        StateError('x'),
+        StackTrace.current,
+      ); // no hace nada ni lanza
       s.dispose();
     },
   );

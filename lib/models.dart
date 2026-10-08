@@ -418,6 +418,9 @@ class Aviso {
   final void Function()? deshacer;
 }
 
+/// Versión de la app (mantener igual que `version` de pubspec.yaml); se añade a los informes de errores.
+const versionApp = '1.0.0+1';
+
 class Settings {
   Settings({
     Set<String>? enabled,
@@ -438,6 +441,7 @@ class Settings {
     this.shareNewProducts = true,
     this.detectarTienda = true,
     this.recompra = true,
+    this.enviarErrores = false,
   }) : enabled = enabled ?? {},
        favChains = favChains ?? {};
 
@@ -455,6 +459,8 @@ class Settings {
   bool showImages; // miniaturas en la lista
   bool
   sharePhotos; // true = compartir fotos sin preguntar; false = preguntar cada vez
+  bool
+  enviarErrores; // informes de errores anónimos al servidor (desactivado por defecto)
   bool recompra; // sugerencias «fantasma» de reposición según tu historial
   bool
   detectarTienda; // al marcar comprado, usa la ubicación para saber en qué tienda estás
@@ -482,6 +488,7 @@ class Settings {
     'shareNewProducts': shareNewProducts,
     'detectarTienda': detectarTienda,
     'recompra': recompra,
+    'enviarErrores': enviarErrores,
   };
 
   factory Settings.fromJson(Map<String, dynamic> j) => Settings(
@@ -503,6 +510,7 @@ class Settings {
     shareNewProducts: j['shareNewProducts'] ?? true,
     detectarTienda: j['detectarTienda'] ?? true,
     recompra: j['recompra'] ?? true,
+    enviarErrores: j['enviarErrores'] ?? false,
   );
 }
 

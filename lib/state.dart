@@ -374,6 +374,61 @@ class AppState extends ChangeNotifier {
 
   /// Si esta cuenta de dispositivo (guardada en el llavero) ya es miembro de listas del servidor que no están en
   /// este dispositivo (reinstalación, datos borrados), las vuelve a añadir. Devuelve cuántas recuperó.
+  // ------------------------------------------------------ informes de errores
+  /// Cola de informes pendientes de enviar (máx. 10, sin repetidos). Solo se llena si el usuario activó los informes.
+  final List<Map<String, dynamic>> _erroresPend = [];
+  bool _enviandoErrores = false;
+
+  void registrarError(Object error, StackTrace? traza) {
+    if (!cfg.enviarErrores) return;
+    var msg = '$error'.replaceAll(RegExp(r'\s+'), ' ');
+    if (msg.length > 380) msg = msg.substring(0, 380);
+    final t = (traza?.toString() ?? '');
+    final clave = '$msg|${t.split('\n').first}';
+    if (_erroresPend.any((e) => e['_k'] == clave)) return;
+    if (_erroresPend.length >= 10) _erroresPend.removeAt(0);
+    _erroresPend.add({
+      '_k': clave,
+      'version': versionApp,
+      'sistema': _sistema(),
+      'mensaje': msg.isEmpty ? 'error' : msg,
+      'traza': t.length > 3900 ? t.substring(0, 3900) : t,
+    });
+    unawaited(_vaciarErrores());
+  }
+
+  String _sistema() {
+    if (kIsWeb) return 'web';
+    final t = '${Platform.operatingSystem} ${Platform.operatingSystemVersion}';
+    return t.length > 60 ? t.substring(0, 60) : t;
+  }
+
+  Future<void> _vaciarErrores() async {
+    if (_enviandoErrores) return;
+    _enviandoErrores = true;
+    try {
+      while (_erroresPend.isNotEmpty && cfg.enviarErrores) {
+        final e = _erroresPend.first;
+        try {
+          await sync.api.enviarError({
+            for (final x in e.entries)
+              if (x.key != '_k') x.key: x.value,
+          });
+        } on PbException catch (x) {
+          if (x.noConnection || x.status >= 500 || x.status == 429) {
+            break; // se reintenta en el próximo error
+          }
+        } catch (_) {
+          break;
+        }
+        _erroresPend.removeAt(0);
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
+    } finally {
+      _enviandoErrores = false;
+    }
+  }
+
   // ------------------------------------------------------------- sanciones
   /// Si el administrador ha sancionado la cuenta por contenido inadecuado: sigue usando la app y la base común,
   /// pero no puede subir fotos ni proponer productos.

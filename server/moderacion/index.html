@@ -185,16 +185,18 @@ async function listar(col, filtro, extra = '') {
   return r;
 }
 async function cargar() {
-  const col = tab === 'productos' ? 'productos' : tab === 'reportes' ? 'reportes' : 'fotos';
-  const r = col === 'reportes'
+  const col = tab === 'productos' ? 'productos' : tab === 'reportes' ? 'reportes' : tab === 'errores' ? 'errores' : 'fotos';
+  const r = col === 'errores'
+    ? await api('/api/collections/errores/records?sort=-created&perPage=100')
+    : col === 'reportes'
     ? await listar('reportes', encodeURIComponent("status='open'"), '&expand=foto')
     : await listar(col, filtroPend);
   if (r.status === 401 || r.status === 403) return loginView('Sin permiso: entra con una cuenta de superusuario.');
   if (r.status !== 200) { $('#app').innerHTML = `<div class="login"><h1>Error</h1><p class="msg">${esc(r.data.message || r.status)}</p><button id="re">Reintentar</button> <button id="out">Salir</button></div>`; $('#re').onclick = cargar; $('#out').onclick = logout; return; }
   items = r.data.items || [];
   const cnt = {};
-  for (const [k, c, f] of [['fotos', 'fotos', filtroPend], ['productos', 'productos', filtroPend], ['reportes', 'reportes', encodeURIComponent("status='open'")]]) {
-    const x = await api(`/api/collections/${c}/records?filter=${f}&perPage=1`);
+  for (const [k, c, f] of [['fotos', 'fotos', filtroPend], ['productos', 'productos', filtroPend], ['reportes', 'reportes', encodeURIComponent("status='open'")], ['errores', 'errores', '']]) {
+    const x = await api(`/api/collections/${c}/records?${f ? 'filter=' + f + '&' : ''}perPage=1`);
     cnt[k] = x.data.totalItems ?? 0;
   }
   pintar(cnt);
@@ -215,6 +217,14 @@ function pintar(cnt) {
       <div class="b"><h3>${esc(it.name)}</h3><div class="mut">${esc([it.brand, it.quantity].filter(Boolean).join(' · '))}</div>
       <div>${it.cold ? '<span class="tag">❄️ frío</span>' : ''}${it.own_chain ? `<span class="tag">exclusivo ${esc(it.own_chain)}</span>` : ''}<span class="tag">${esc(it.key)}</span></div>
       <div class="mut">equivalencia: ${esc(it.generic_key || '—')}</div>${botones(it.id)}</div></div>`).join('');
+  else if (tab === 'errores') {
+    const grupos = new Map();
+    for (const e of items) { const k = (e.mensaje || '') + '|' + (e.version || ''); const g = grupos.get(k) || { e, n: 0 }; g.n++; grupos.set(k, g); }
+    cards = [...grupos.values()].map(({ e, n }) => `
+    <div class="card"><div class="b"><h3>${esc(e.mensaje)}${n > 1 ? ` <span class="tag">×${n}</span>` : ''}</h3>
+      <div class="mut">${esc((e.created || '').slice(0, 16))} · v${esc(e.version || '?')} · ${esc(e.sistema || '')}</div>
+      <details><summary class="mut">traza</summary><pre style="white-space:pre-wrap;font-size:11px">${esc(e.traza || '')}</pre></details></div></div>`).join('');
+  }
   else cards = items.map(it => { const f = it.expand && it.expand.foto; return `
     <div class="card" data-id="${it.id}">${f ? `<a href="${fotoUrl(f)}" target="_blank"><img src="${fotoUrl(f, true)}" alt=""></a>` : ''}
       <div class="b"><h3>${esc(it.motivo)}</h3><div class="mut">${esc(it.nota || '')}</div>
@@ -223,14 +233,16 @@ function pintar(cnt) {
   $('#app').innerHTML = `<header><h1>Moderación</h1><button id="out">Salir</button></header>
     <main><div class="tabs"><button id="t1" class="${tab === 'fotos' ? 'on' : ''}">Fotos (${cnt.fotos})</button>
     <button id="t2" class="${tab === 'productos' ? 'on' : ''}">Productos (${cnt.productos})</button>
-    <button id="t3" class="${tab === 'reportes' ? 'on' : ''}">Reportes (${cnt.reportes})</button></div>
+    <button id="t3" class="${tab === 'reportes' ? 'on' : ''}">Reportes (${cnt.reportes})</button>
+    <button id="t4" class="${tab === 'errores' ? 'on' : ''}">Errores (${cnt.errores})</button></div>
     ${tab === 'fotos' ? '<div class="regla">Solo fotos <b>puras de producto</b>: sin tickets, caras, dedos ni fondos con personas. Si está casi bien, <b>Ajustar</b> (girar y recortar). Al aprobar, la foto se reconstruye sin metadatos (EXIF/GPS) y se sustituye el archivo.</div>' : ''}
-    ${items.length && tab !== 'reportes' ? `<div class="row"><button class="ok" id="allok">Aprobar todo lo visible (${items.length})</button></div>` : ''}
+    ${items.length && (tab === 'fotos' || tab === 'productos') ? `<div class="row"><button class="ok" id="allok">Aprobar todo lo visible (${items.length})</button></div>` : ''}
     ${cards || '<div class="empty">Nada pendiente 🎉</div>'}</main>`;
   $('#out').onclick = logout;
   $('#t1').onclick = () => { tab = 'fotos'; cargar(); };
   $('#t2').onclick = () => { tab = 'productos'; cargar(); };
   $('#t3').onclick = () => { tab = 'reportes'; cargar(); };
+  $('#t4').onclick = () => { tab = 'errores'; cargar(); };
   document.querySelectorAll('[data-a]').forEach(b => b.onclick = () => accion(b));
   const all = $('#allok');
   if (all) all.onclick = async () => {

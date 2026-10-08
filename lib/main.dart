@@ -1,3 +1,5 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,6 +15,15 @@ Future<void> main() async {
   final prefs = await SharedPreferences.getInstance();
   final state = AppState(prefs);
   if (capturasActivas) await sembrarCapturas(state);
+  final previo = FlutterError.onError;
+  FlutterError.onError = (d) {
+    previo?.call(d);
+    state.registrarError(d.exception, d.stack);
+  };
+  PlatformDispatcher.instance.onError = (e, st) {
+    state.registrarError(e, st);
+    return true;
+  };
   runApp(MultiMarketApp(state));
 }
 

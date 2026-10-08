@@ -11,6 +11,10 @@ import '../ticket/ticket_lector.dart';
 import '../ticket/ticket_match.dart';
 import '../ticket/ticket_parser.dart';
 
+/// Hacer la foto del ticket con la cámara se activará en una versión futura (el OCR de fotos aún falla con los textos).
+/// Importar un PDF o una imagen guardada sigue disponible.
+const permitirFotoTicket = false;
+
 void abrirImportarTicket(BuildContext context) => Navigator.of(
   context,
 ).push(MaterialPageRoute(builder: (_) => const TicketPage()));
@@ -172,7 +176,9 @@ class _TicketPageState extends State<TicketPage> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              if (hayOcr && (Platform.isIOS || Platform.isAndroid))
+              if (permitirFotoTicket &&
+                  hayOcr &&
+                  (Platform.isIOS || Platform.isAndroid))
                 OutlinedButton.icon(
                   onPressed: trabajando ? null : _camara,
                   icon: const Icon(Icons.photo_camera),

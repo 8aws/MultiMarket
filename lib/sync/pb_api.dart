@@ -352,6 +352,12 @@ class PbApi {
   }
 
   /// Propone un producto nuevo a la base general. Queda pendiente de moderación.
+  /// Informe de error anónimo (solo si el usuario lo ha activado en Ajustes).
+  Future<void> enviarError(Map<String, dynamic> informe) async {
+    await ensureAuth();
+    await call('POST', '/api/collections/errores/records', body: informe);
+  }
+
   /// Registro de esta cuenta (incluye si tiene una sanción activa para compartir contenido).
   Future<Map<String, dynamic>> miUsuario() async {
     await ensureAuth();
