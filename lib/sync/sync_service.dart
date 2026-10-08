@@ -457,12 +457,19 @@ class SyncService extends ChangeNotifier {
                   '/api/realtime',
                   body: {
                     'clientId': clientId,
-                    'subscriptions': ['items', 'miembros'],
+                    'subscriptions': ['items', 'miembros', 'avisos'],
                   },
                 );
                 espera = 2;
                 programar(ms: 100);
               }
+            } else if (evento == 'avisos') {
+              try {
+                final d = jsonDecode(linea.substring(5)) as Map;
+                if (d['action'] == 'create') {
+                  s.avisoRemoto((d['record'] as Map).cast<String, dynamic>());
+                }
+              } catch (_) {}
             } else {
               programar(ms: 250); // algo cambió en el hogar
             }

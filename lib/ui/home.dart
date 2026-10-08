@@ -94,6 +94,24 @@ class _HomePageState extends State<HomePage> {
         titleSpacing: 0,
         scrolledUnderElevation: 0,
         actions: [
+          if (s.tab == 0 &&
+              s.hogares.any((h) => h.id == s.currentId && h.remota))
+            IconButton(
+              tooltip: 'Voy yo a comprar (avisa a la lista)',
+              icon: const Icon(Icons.directions_walk),
+              onPressed: () async {
+                final e = await s.voyYo();
+                if (e != null && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(e),
+                      behavior: SnackBarBehavior.floating,
+                      showCloseIcon: true,
+                    ),
+                  );
+                }
+              },
+            ),
           if (s.tab == 0)
             IconButton(
               tooltip: 'Modo compra: escanear en la tienda',

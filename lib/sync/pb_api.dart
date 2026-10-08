@@ -213,6 +213,19 @@ class PbApi {
     ];
   }
 
+  /// Avisa al resto de miembros de la lista («voy yo»).
+  Future<void> avisar(String hogarId, String alias, String texto) => call(
+    'POST',
+    '/api/collections/avisos/records',
+    body: {
+      'hogar': hogarId,
+      'user': userId,
+      'alias': alias,
+      'tipo': 'voy',
+      'texto': texto,
+    },
+  );
+
   Future<Map<String, dynamic>> unirse(String code, String alias) => call(
     'POST',
     '/api/mm/join',

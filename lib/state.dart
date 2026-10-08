@@ -1117,6 +1117,39 @@ class AppState extends ChangeNotifier {
     return marcados;
   }
 
+  // --------------------------------------------------------------- avisos
+  /// «Voy yo»: avisa al resto de la lista compartida de que vas a hacer la compra.
+  Future<String?> voyYo() async {
+    final h = hogares.where((h) => h.id == currentId).firstOrNull;
+    if (h == null || !h.remota) return 'Solo en listas compartidas';
+    final quien = cfg.alias.trim().isEmpty ? 'Alguien' : cfg.alias.trim();
+    final st = await tiendaActual();
+    final texto = st == null
+        ? '$quien va a hacer la compra'
+        : '$quien va a comprar en ${st.name}';
+    try {
+      await sync.api.ensureAuth(alias: cfg.alias);
+      await sync.api.avisar(h.id, cfg.alias, texto);
+      _avisos.add(Aviso('Avisado: $texto'));
+      return null;
+    } on PbException catch (e) {
+      return e.status == 429 ? 'Demasiados avisos seguidos' : e.message;
+    }
+  }
+
+  /// Llega un aviso de otro miembro por el tiempo real: se muestra y notifica (no los míos ni los antiguos).
+  void avisoRemoto(Map<String, dynamic> r) {
+    if (r['user'] == sync.miId) return;
+    if (!hogares.any((h) => h.id == r['hogar'])) return;
+    final creado = DateTime.tryParse('${r['created']}'.replaceFirst(' ', 'T'));
+    if (creado != null && DateTime.now().difference(creado).inMinutes > 10) {
+      return;
+    }
+    final texto = (r['texto'] as String?) ?? '${r['alias'] ?? 'Alguien'} avisa';
+    _avisos.add(Aviso(texto));
+    Notifier.now(_nid('${r['id']}', 3000), 'MultiMarket', texto);
+  }
+
   void toggleDone(Item it) {
     it.done = !it.done;
     if (it.done) {

@@ -80,6 +80,22 @@ class Notifier {
     linux: LinuxNotificationDetails(),
   );
 
+  /// Notificación inmediata (avisos de otros miembros recibidos con la app abierta).
+  static Future<void> now(int id, String title, String body) async {
+    if (!_ready) return;
+    await _ensurePermission();
+    try {
+      await _plugin.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: _details,
+      );
+    } catch (e) {
+      debugPrint('Notifier.now falló: $e');
+    }
+  }
+
   static Future<void> schedule(
     int id,
     String title,
