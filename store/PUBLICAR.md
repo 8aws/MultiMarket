@@ -38,6 +38,8 @@ App Store Connect, que haces tú con tu cuenta.
 - **Clasificación por edades:** sin contenido objetable. Contesta que SÍ hay contenido generado por usuarios (fotos y productos de la
   comunidad, con moderación previa) y que NO hay chat, web sin restricciones ni publicidad. Lo esperable es **13+** (Apple fija ese
   mínimo cuando la app muestra contenido de otros usuarios); acepta el resultado del cuestionario, sin bajarlo.
+  Si te sale 4+ pero prefieres **13+** (recomendado: app de compradores con contenido de otros usuarios), en la pestaña de
+  clasificación por edades de App Store Connect hay una opción para **elegir una clasificación superior** a la calculada.
 - **Privacidad de la app:** respuestas en `store/etiquetas_privacidad.md` (revísalas, son una declaración tuya).
   Añade «Contenido del usuario → Otro contenido» por los precios que se aportan de forma anónima desde los tickets.
 - **Información de revisión:** contacto (tu nombre, teléfono y multimarket@uverse.es). No hace falta cuenta ni contraseña.
