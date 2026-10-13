@@ -10,6 +10,7 @@ import 'package:multimarket/models.dart';
 import 'package:multimarket/state.dart';
 
 void main() {
+  precioPorNombreTests();
   reporteTests();
   fotoTests();
   comparacionTests();
@@ -268,6 +269,37 @@ void reporteTests() {
         isNull,
       );
       expect(api.fotoIdDeUrl(null), isNull);
+    },
+  );
+}
+
+void precioPorNombreTests() {
+  test(
+    'un precio anotado por nombre sirve al añadir el mismo producto por código de barras',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final s = AppState(await SharedPreferences.getInstance());
+      s.cfg.demoPrices = false;
+      final st = s.activeStores.first;
+      // 1) añadido por nombre y precio anotado
+      final porNombre = s.add(const Product(name: 'Tomate frito'));
+      porNombre.storeId = st.id;
+      s.recordPrice(porNombre, 0.95);
+      // 2) el mismo producto por código de barras (nombre con marca y tamaño, como llega de Open Food Facts)
+      const off = Product(
+        name: 'Tomate frito · Hacendado',
+        barcode: '8480000123456',
+        genericKey: 'tomate-frito|400g',
+      );
+      final ops = await s.options(off);
+      final o = ops.firstWhere((o) => o.store.chain == st.chain);
+      expect(o.price, 0.95);
+      expect(
+        o.quote!.equivalente,
+        isTrue,
+        reason: 'se marca como estimado: no es el mismo envase',
+      );
+      s.dispose();
     },
   );
 }

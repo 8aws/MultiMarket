@@ -69,9 +69,42 @@ class PbApi {
 
   Future<bool> get tieneCuenta async => await _read('mm_email') != null;
 
+  Future<void>? _autenticando;
+
   /// Crea (si hace falta) la cuenta del dispositivo e inicia sesión.
-  Future<void> ensureAuth({String alias = ''}) async {
-    if (_token != null && userId != null) return;
+  /// Las llamadas simultáneas comparten una única autenticación (el servidor limita `auth` a 2 cada 3 s por IP) y
+  /// la sesión se guarda en el llavero mientras no caduque, para no volver a entrar con la contraseña en cada arranque.
+  Future<void> ensureAuth({String alias = ''}) {
+    if (_token != null && userId != null) return Future.value();
+    return _autenticando ??= _autenticar(
+      alias: alias,
+    ).whenComplete(() => _autenticando = null);
+  }
+
+  /// `exp` e `id` del JWT de PocketBase (sin verificar la firma: solo para decidir si reutilizarlo).
+  ({int exp, String id})? _leerJwt(String t) {
+    try {
+      final p = t.split('.')[1];
+      final m =
+          jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(p))))
+              as Map;
+      return (exp: (m['exp'] as num).toInt(), id: m['id'] as String);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _autenticar({String alias = ''}) async {
+    final guardado = await _read('mm_token');
+    if (guardado != null) {
+      final j = _leerJwt(guardado);
+      final ahora = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      if (j != null && j.exp - ahora > 86400) {
+        _token = guardado;
+        userId = j.id;
+        return;
+      }
+    }
     var email = await _read('mm_email');
     var pass = await _read('mm_pass');
     if (email == null || pass == null) {
@@ -90,13 +123,26 @@ class PbApi {
       await _write('mm_email', email);
       await _write('mm_pass', pass);
     }
-    final r = await _raw(
-      'POST',
-      '/api/collections/users/auth-with-password',
-      body: {'identity': email, 'password': pass},
-    );
+    Map<String, dynamic> r;
+    try {
+      r = await _raw(
+        'POST',
+        '/api/collections/users/auth-with-password',
+        body: {'identity': email, 'password': pass},
+      );
+    } on PbException catch (e) {
+      if (e.status != 429) rethrow;
+      // límite de intentos: se espera a que se abra la ventana de 3 s y se reintenta una vez
+      await Future<void>.delayed(const Duration(milliseconds: 3500));
+      r = await _raw(
+        'POST',
+        '/api/collections/users/auth-with-password',
+        body: {'identity': email, 'password': pass},
+      );
+    }
     _token = r['token'] as String;
     userId = (r['record'] as Map)['id'] as String;
+    await _write('mm_token', _token!);
   }
 
   /// Borra la cuenta de este dispositivo en el servidor (derecho de supresión). Los datos asociados se
@@ -113,7 +159,7 @@ class PbApi {
 
   /// Olvida las credenciales de dispositivo guardadas (la próxima vez que haga falta se crea otra cuenta).
   Future<void> olvidarCuenta() async {
-    for (final k in ['mm_email', 'mm_pass']) {
+    for (final k in ['mm_email', 'mm_pass', 'mm_token']) {
       try {
         await _store.delete(key: k);
       } catch (_) {}
@@ -121,6 +167,13 @@ class PbApi {
     }
     _token = null;
     userId = null;
+  }
+
+  Future<void> _borrarTokenGuardado() async {
+    try {
+      await _store.delete(key: 'mm_token');
+    } catch (_) {}
+    await _prefs.remove('sec:mm_token');
   }
 
   Future<void> cerrarSesion() async {
@@ -175,7 +228,13 @@ class PbApi {
         // sesión caducada: se vuelve a entrar con las credenciales del dispositivo
         _token = null;
         userId = null;
+        await _borrarTokenGuardado();
         await ensureAuth();
+        return _raw(method, path, body: body, query: query, token: _token);
+      }
+      if (e.status == 429) {
+        // demasiadas peticiones seguidas: una sola reintento pasado el límite de ventana
+        await Future<void>.delayed(const Duration(seconds: 3));
         return _raw(method, path, body: body, query: query, token: _token);
       }
       rethrow;

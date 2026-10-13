@@ -9,6 +9,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'catalog.dart' show genericKey;
 import 'models.dart';
 import 'notifier.dart';
 import 'recompra.dart';
@@ -216,6 +217,18 @@ class AppState extends ChangeNotifier {
           outOfStock: v['o'] ?? false,
         ),
       );
+      // precios guardados antes de existir la clave «por nombre»: se crea para los productos añadidos por nombre
+      for (final k in _local.keys.toList()) {
+        if (k.startsWith('g:') || k.startsWith('b:')) continue;
+        final i = k.lastIndexOf('|');
+        if (i <= 0) continue;
+        final nombre = k.substring(0, i);
+        if (RegExp(r'^\d{8,14}$').hasMatch(nombre)) continue;
+        final b = genericKey(fallbackName: nombre);
+        if (b != null) {
+          _local.putIfAbsent('b:$b|${k.substring(i + 1)}', () => _local[k]!);
+        }
+      }
     } catch (_) {
       // datos corruptos: se empieza de cero
     }
@@ -959,6 +972,21 @@ class AppState extends ChangeNotifier {
   }
 
   // ------------------------------------------------------------------ precios
+  /// Clave «por nombre» (sin marca ni tamaño): une el mismo producto añadido por nombre y por código de barras.
+  String? _claveBase(Product p) {
+    final gk = p.genericKey;
+    if (gk != null) return gk.split('|').first;
+    return genericKey(fallbackName: p.name);
+  }
+
+  /// Guarda un precio propio bajo la clave exacta del producto, la de equivalencia y la «por nombre».
+  void _guardarPrecio(Product p, String chain, Quote q) {
+    _local['${p.key}|$chain'] = q;
+    if (p.genericKey != null) _local['g:${p.genericKey}|$chain'] = q;
+    final b = _claveBase(p);
+    if (b != null) _local['b:$b|$chain'] = q;
+  }
+
   Future<Map<String, Quote>> _quotes(Product p) async {
     final out = <String, Quote>{};
     if (cfg.demoPrices) {
@@ -999,6 +1027,14 @@ class AppState extends ChangeNotifier {
             outOfStock: g.outOfStock,
             equivalente: true,
           );
+        }
+      }
+      // mismo producto añadido de otra forma (por nombre / por código): precio «por nombre», marcado como equivalente
+      if (out[s.chain] == null) {
+        final b = _claveBase(p);
+        final n = b == null ? null : _local['b:$b|${s.chain}'];
+        if (n != null && !n.outOfStock) {
+          out[s.chain] = Quote(n.price, n.date, n.source, equivalente: true);
         }
       }
       final o = offers['${p.key}|${s.chain}'];
@@ -1184,8 +1220,7 @@ class AppState extends ChangeNotifier {
   /// Anota el precio visto en la tienda para un producto (sin que esté en la lista).
   void anotarPrecio(Product p, Store st, double price) {
     final q = Quote(price, DateTime.now(), QuoteSource.tu);
-    _local['${p.key}|${st.chain}'] = q;
-    if (p.genericKey != null) _local['g:${p.genericKey}|${st.chain}'] = q;
+    _guardarPrecio(p, st.chain, q);
     changed();
   }
 
@@ -1332,11 +1367,16 @@ class AppState extends ChangeNotifier {
       // precio de estantería (sin promos personales) como precio conocido de la cadena
       if (st != null) {
         final unit = l.porPeso ? l.bruto : l.bruto / unidades;
-        _local['$key|${st.chain}'] = Quote(
+        final q = Quote(
           unit,
           DateTime.fromMillisecondsSinceEpoch(ms),
           QuoteSource.tu,
         );
+        _local['$key|${st.chain}'] = q;
+        final b = it != null
+            ? _claveBase(productOf(it))
+            : genericKey(fallbackName: nombre);
+        if (b != null) _local['b:$b|${st.chain}'] = q;
       }
       compras.add(
         Compra(
@@ -1691,8 +1731,7 @@ class AppState extends ChangeNotifier {
     if (s == null) return;
     final p = productOf(it);
     final q = Quote(price, DateTime.now(), QuoteSource.tu);
-    _local['${p.key}|${s.chain}'] = q;
-    if (p.genericKey != null) _local['g:${p.genericKey}|${s.chain}'] = q;
+    _guardarPrecio(p, s.chain, q);
     it.price = price;
     changed();
   }
