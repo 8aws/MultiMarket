@@ -102,6 +102,9 @@ class AppState extends ChangeNotifier {
   /// Última foto enlazada (Open Food Facts o comunidad) de cada producto: permite recuperarla desde el historial.
   final Map<String, String> imagenesUrl = {};
 
+  /// Confianza del precio de cada producto de la lista (solo local): ausente = escrito a mano (negro).
+  final Map<String, String> confPrecio = {};
+
   /// Ofertas temporales anotadas a mano: 'productKey|cadena'.
 
   // ----- temporizador de frío
@@ -169,6 +172,10 @@ class AppState extends ChangeNotifier {
       frioManual.addAll(
         (jsonDecode(_prefs.getString('frioManual') ?? '{}') as Map)
             .cast<String, bool>(),
+      );
+      confPrecio.addAll(
+        (jsonDecode(_prefs.getString('confPrecio') ?? '{}') as Map)
+            .cast<String, String>(),
       );
       imagenesUrl.addAll(
         (jsonDecode(_prefs.getString('imagenesUrl') ?? '{}') as Map)
@@ -273,6 +280,7 @@ class AppState extends ChangeNotifier {
     }
     _prefs.setString('fotosLocales', jsonEncode(fotosLocales));
     _prefs.setString('imagenesUrl', jsonEncode(imagenesUrl));
+    _prefs.setString('confPrecio', jsonEncode(confPrecio));
     _prefs.setString(
       'hogares',
       jsonEncode(hogares.map((h) => h.toJson()).toList()),
@@ -1152,6 +1160,12 @@ class AppState extends ChangeNotifier {
   void assign(Item it, Option? o) {
     it.storeId = o?.store.id;
     it.price = o?.price;
+    final c = o?.quote?.conf;
+    if (c == null) {
+      confPrecio.remove(it.id);
+    } else {
+      confPrecio[it.id] = c.name;
+    }
     changed();
   }
 
@@ -1436,6 +1450,7 @@ class AppState extends ChangeNotifier {
           'chain': st.chain,
           'price': l.porPeso ? l.bruto : l.bruto / unidades,
           'name': nombre,
+          'fiable': t.cuadra && !l.dudosa,
           'fecha':
               '${f.year}-${f.month.toString().padLeft(2, '0')}-${f.day.toString().padLeft(2, '0')}',
         });
@@ -1750,6 +1765,9 @@ class AppState extends ChangeNotifier {
     bool oferta = false,
     DateTime? hasta,
   }) {
+    confPrecio.remove(
+      it.id,
+    ); // un precio escrito por ti vale lo que tú digas: en negro
     if (price == null || price <= 0) {
       it.price = null;
       changed();
@@ -1797,6 +1815,7 @@ class AppState extends ChangeNotifier {
     final p = productOf(it);
     final q = Quote(price, DateTime.now(), QuoteSource.tu);
     _guardarPrecio(p, s.chain, q);
+    confPrecio.remove(it.id);
     it.price = price;
     changed();
   }

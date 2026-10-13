@@ -152,6 +152,31 @@ class Product {
 
 enum QuoteSource { openPrices, tu, ejemplo, comunidad }
 
+/// Cuánto fiarse de un precio que no has escrito tú: alta (verde), media (amarillo) o baja (rojo).
+/// Un precio escrito a mano (`conf == null`) se muestra en negro.
+enum Confianza { alta, media, baja }
+
+/// Confianza de un precio de la comunidad a partir de sus observaciones:
+/// - alta: hay al menos una observación fiable (ticket que cuadra) y el rango es ≤ 25 %, o se repite (≥ 2) dentro de ±10 %;
+/// - baja: una sola observación no fiable, o disparidad > 40 %;
+/// - media: el resto (disparidad intermedia o fuentes menos fiables). Un dato de más de 60 días no pasa de media.
+Confianza confianzaComunidad({
+  required int n,
+  required int fiables,
+  required double min,
+  required double max,
+  required double mediana,
+  required DateTime fecha,
+}) {
+  final spread = mediana <= 0 ? 1.0 : (max - min) / mediana;
+  if (spread > 0.40) return Confianza.baja;
+  if (n <= 1 && fiables == 0) return Confianza.baja;
+  final alta = (fiables >= 1 && spread <= 0.25) || (n >= 2 && spread <= 0.10);
+  final viejo = DateTime.now().difference(fecha).inDays > 60;
+  if (alta && !viejo) return Confianza.alta;
+  return Confianza.media;
+}
+
 const _months = [
   'ene',
   'feb',
@@ -176,8 +201,12 @@ class Quote {
     this.outOfStock = false,
     this.until,
     this.equivalente = false,
+    this.conf,
   });
   final double? price;
+
+  /// Confianza del precio (null = escrito a mano por ti).
+  final Confianza? conf;
   final DateTime date;
   final QuoteSource source;
   final bool outOfStock;

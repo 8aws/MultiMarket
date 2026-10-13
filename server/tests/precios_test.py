@@ -48,11 +48,16 @@ try:
     it = (r.get("items") or [{}])[0]
     check("lectura pública agregada: mediana de 3 observaciones", s == 200 and it.get("price") == 1.10 and it.get("n") == 3, r)
     check("sin autor en la respuesta", all("owner" not in x for x in r.get("items", [])), r)
+    it = r["items"][0]
+    check("devuelve rango y observaciones fiables", it.get("min") == 1.0 and it.get("max") == 1.2 and it.get("fiables") == 0, it)
     s, r = call("/api/mm/v1/precios?bases=base-" + clave, "GET")
     check("también por clave «por nombre»", s == 200 and len(r.get("items", [])) == 1, r)
+    s, _ = call("/api/mm/v1/precios", "POST", ta, {"items": [{**obs(1.15, dias[4]), "fiable": True}]})
+    s, r = call("/api/mm/v1/precios?keys=" + clave, "GET")
+    check("las observaciones fiables se cuentan", s == 200 and r["items"][0]["fiables"] == 1 and r["items"][0]["n"] == 4, r)
     s, _ = call("/api/mm/v1/precios", "POST", ta, {"items": [obs(40.0, dias[3])]})
     s, r = call("/api/mm/v1/precios?keys=" + clave, "GET")
-    check("un valor atípico no mueve la mediana", s == 200 and r["items"][0]["price"] == 1.10 and r["items"][0]["n"] == 3, r)
+    check("un valor atípico no mueve la mediana", s == 200 and r["items"][0]["price"] in (1.10, 1.15) and r["items"][0]["n"] == 4, r)
     s, _ = call("/api/collections/precios/records", "GET", ta)
     check("la colección en bruto no es accesible", s in (400, 403, 404), s)
     s, r = call("/api/mm/v1/precios", "GET")

@@ -101,7 +101,7 @@ final _colaPrecioRe = RegExp(
   caseSensitive: false,
 );
 final _anclaFinRe = RegExp(
-  r'^\s*(total\b|a pagar|suma\b|iva\b|desglose|entrega|subtotal|base\b)',
+  r'^\s*(total\b|\d+\s*art\.?\s*total|a pagar|suma\b|iva\b|desglose|entrega|subtotal|base\b)',
   caseSensitive: false,
 );
 final _descuentoRe = RegExp(
@@ -177,12 +177,54 @@ String _arreglarDigitos(String l) => l
     );
 
 /// Interpreta un ticket a partir de sus líneas de texto.
+final _soloPrecioRe = RegExp(
+  r'^-?\d+[.,]\d{2}\s*(?:€|eur)?$',
+  caseSensitive: false,
+);
+final _terminaEnPrecioRe = RegExp(
+  r'\d+[.,]\d{2}\s*(?:€|£|eur)?\s*[A-Z]?$',
+  caseSensitive: false,
+);
+// «6 x ( 2,89 ) 17,34» (Carrefour: cantidad × (unitario) y el total)
+final _cantParRe = RegExp(
+  r'^(\d+)\s*[x×]\s*\(\s*(\d+[.,]\d{2})\s*\)\s*(-?\d+[.,]\d{2})$',
+  caseSensitive: false,
+);
+
+/// Algunos tickets (Carrefour en PDF) ponen el importe en la línea SIGUIENTE al nombre, y a veces la página
+/// corta entre ambos. Se une cada importe suelto al texto que lo precede para que el resto del lector no lo note.
+List<String> _unirPrecios(List<String> ls) {
+  final out = <String>[];
+  for (final l in ls) {
+    if (_soloPrecioRe.hasMatch(l) &&
+        out.isNotEmpty &&
+        !_terminaEnPrecioRe.hasMatch(out.last) &&
+        !_soloPrecioRe.hasMatch(out.last)) {
+      out[out.length - 1] = '${out.last} $l';
+      continue;
+    }
+    out.add(l);
+  }
+  // «NOMBRE» + «6 x ( 2,89 ) 17,34»  →  «NOMBRE 6x 2,89 17,34»
+  final res = <String>[];
+  for (final l in out) {
+    final m = _cantParRe.firstMatch(l);
+    if (m != null && res.isNotEmpty && !_terminaEnPrecioRe.hasMatch(res.last)) {
+      res[res.length - 1] =
+          '${res.last} ${m.group(1)}x ${m.group(2)} ${m.group(3)}';
+      continue;
+    }
+    res.add(l);
+  }
+  return res;
+}
+
 Ticket parsearTicket(List<String> crudas) {
-  final lineas = [
+  final lineas = _unirPrecios([
     for (final l in crudas)
       if (l.trim().isNotEmpty)
         _arreglarDigitos(l.replaceAll(RegExp(r'[ \t]+'), ' ').trim()),
-  ];
+  ]);
   final cadena = _detectarCadena(lineas);
   final fecha = _detectarFecha(lineas);
 
@@ -200,7 +242,7 @@ Ticket parsearTicket(List<String> crudas) {
     final v = m == null ? null : _num(m.group(2)!);
     if (v != null) {
       if (RegExp(
-        r'^(total a pagar|a pagar|total pagado|importe total)',
+        r'^(\d+\s*art\.?\s*)?(total a pagar|a pagar|total pagado|importe total)',
       ).hasMatch(nombre)) {
         totalPagar ??= v;
       } else if (RegExp(

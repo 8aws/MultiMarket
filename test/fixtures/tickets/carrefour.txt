@@ -1,0 +1,56 @@
+***CARREFOUR***
+Ciudad Ejemplo
+CIF: B00000000
+Telf. Directo Tienda 900000000
+HIPERMERCADOS EJEMPLO, S.L.
+**************************************
+REFRESCO COLA 1,75 2U     DP65
+      6 x (     2,89 )
+17,34
+DESCUENTO EN 2ª UNIDAD    DP65
+-4,34
+COMPRESAS NOCHE 40U       ED14
+2,99
+ARROZ LARGO MARCA
+1,09
+GALLETAS CHOCOLATE
+1,99
+FIDEOS Nº0 675
+1,80
+PATATAS FRITAS HORNO      P13
+2,09
+TOMATE FRITO ORLANDO
+1,99
+YOGUR NATURAL X 8
+1,95
+JAMON COCIDO 120 G
+      3 x (     2,00 )
+6,00
+PIMIENTO TIPO PADRON      30%
+0,70
+CIABATTA CRISTAL
+      2 x (     0,57 )
+1,14
+CERDO CHULETA FILET
+4,75
+POLLO PECHUGA ENTERA
+6,54
+========================================
+      14 ART. TOTAL A PAGAR :
+46,03
+========================================
+VENTAJAS OBTENIDAS:
+  ACUMULADO CLUB:
+0,93
+  DESCUENTOS:
+4,34
+   TIPO             BASE            CUOTA
+  10,00%            41,85             4,18
+ VENTA
+46,03
+ VISA DEBIT
+ XXXXXXXXXXXX0000 01
+ 13/10/2026 14:22:14
+ IMPORTE: 46,03 EUR
+ SOCIO CLUB CARREFOUR(***):     00000000
+ Saldo acumulado a 13/10/2026:20,53 €

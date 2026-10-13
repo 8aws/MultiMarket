@@ -42,6 +42,7 @@ routerAdd("POST", "/api/mm/v1/precios", (e) => {
       r.set("dia", dia);
       r.set("source", "ticket");
       r.set("outlier", outlier);
+      r.set("fiable", it.fiable === true);
       r.set("owner", uid);
       $app.save(r);
       guardados++;
@@ -76,13 +77,21 @@ routerAdd("GET", "/api/mm/v1/precios", (e) => {
     const porCadena = {};
     for (const r of filas) {
       const c = r.getString("chain");
-      (porCadena[c] = porCadena[c] || []).push({ p: r.getFloat("price"), d: r.getString("dia") });
+      (porCadena[c] = porCadena[c] || []).push({ p: r.getFloat("price"), d: r.getString("dia"), f: r.getBool("fiable") });
     }
     const out = [];
     for (const c of Object.keys(porCadena)) {
       const l = porCadena[c];
       const v = l.map((x) => x.p).sort((a, b) => a - b);
-      out.push({ chain: c, price: v[Math.floor(v.length / 2)], n: l.length, fecha: l[0].d });
+      out.push({
+        chain: c,
+        price: v[Math.floor(v.length / 2)],
+        min: v[0],
+        max: v[v.length - 1],
+        n: l.length,
+        fiables: l.filter((x) => x.f).length,
+        fecha: l[0].d,
+      });
     }
     return out;
   };

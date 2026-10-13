@@ -598,6 +598,48 @@ class SettingsPage extends StatelessWidget {
           ),
         ),
 
+        // ------------------------------------------------ colores de los precios
+        h('Colores de los precios'),
+        const Card(
+          child: Padding(
+            padding: EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _LeyendaPrecio(
+                  color: null,
+                  titulo: 'Negro · escrito por ti',
+                  texto:
+                      'Lo anotaste tú a mano (o por un ticket tuyo): vale lo que tú digas.',
+                ),
+                _LeyendaPrecio(
+                  color: Color(0xFF1E8E3E),
+                  titulo: 'Verde · fiable',
+                  texto:
+                      'Viene de un ticket que cuadra con su total y la cifra es coherente, o lo han confirmado varios usuarios con diferencias de ±10 %.',
+                ),
+                _LeyendaPrecio(
+                  color: Color(0xFFB26A00),
+                  titulo: 'Ámbar · orientativo',
+                  texto:
+                      'Hay disparidad entre usuarios (más del 10 %), el dato es antiguo (más de 60 días), es de un producto equivalente por nombre o la fuente es colaborativa sin verificar (Open Prices).',
+                ),
+                _LeyendaPrecio(
+                  color: Color(0xFFC62828),
+                  titulo: 'Rojo · poco fiable',
+                  texto:
+                      'Solo lo ha visto un usuario en un ticket que no cuadra, la disparidad es muy alta (más del 40 %) o es un precio de ejemplo.',
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'El color nunca cambia tus datos: es solo una ayuda para decidir. Pulsa un precio en la lista para cambiarlo.',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ),
+
         // ------------------------------------------------ privacidad
         h('Privacidad'),
         Card(
@@ -832,4 +874,50 @@ Future<void> confirmarEliminarCuenta(BuildContext context, AppState s) async {
       ),
     ),
   );
+}
+
+class _LeyendaPrecio extends StatelessWidget {
+  const _LeyendaPrecio({
+    required this.color,
+    required this.titulo,
+    required this.texto,
+  });
+  final Color? color;
+  final String titulo;
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 3, right: 10),
+            child: Text(
+              '0,00 €',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: color,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  titulo,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                Text(texto, style: const TextStyle(fontSize: 12)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

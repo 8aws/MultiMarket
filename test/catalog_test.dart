@@ -10,6 +10,7 @@ import 'package:multimarket/models.dart';
 import 'package:multimarket/state.dart';
 
 void main() {
+  confianzaPreciosTests();
   precioPorNombreTests();
   reporteTests();
   fotoTests();
@@ -302,4 +303,40 @@ void precioPorNombreTests() {
       s.dispose();
     },
   );
+}
+
+void confianzaPreciosTests() {
+  final hoy = DateTime.now();
+  Confianza c(
+    int n,
+    int f,
+    double min,
+    double max,
+    double med, {
+    int dias = 1,
+  }) => confianzaComunidad(
+    n: n,
+    fiables: f,
+    min: min,
+    max: max,
+    mediana: med,
+    fecha: hoy.subtract(Duration(days: dias)),
+  );
+
+  test('verde: ticket fiable coherente, o repetido dentro de ±10 %', () {
+    expect(c(1, 1, 1.0, 1.0, 1.0), Confianza.alta);
+    expect(c(3, 0, 1.00, 1.08, 1.04), Confianza.alta);
+  });
+  test(
+    'ámbar: disparidad intermedia, dato viejo o fuente menos fiable con varias observaciones',
+    () {
+      expect(c(3, 0, 1.0, 1.25, 1.1), Confianza.media);
+      expect(c(2, 2, 1.0, 1.0, 1.0, dias: 90), Confianza.media);
+      expect(c(2, 1, 1.0, 1.35, 1.1), Confianza.media);
+    },
+  );
+  test('rojo: una sola observación no fiable o disparidad muy alta', () {
+    expect(c(1, 0, 1.0, 1.0, 1.0), Confianza.baja);
+    expect(c(4, 2, 0.8, 1.6, 1.0), Confianza.baja);
+  });
 }

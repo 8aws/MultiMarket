@@ -283,6 +283,15 @@ class AppDrawer extends StatelessWidget {
   }
 }
 
+/// Color del importe según la confianza del precio: negro = escrito a mano, verde = fiable,
+/// ámbar = disparidad o fuente menos fiable, rojo = pocos datos o poco fiable.
+Color? colorConfianza(String? conf) => switch (conf) {
+  'alta' => const Color(0xFF1E8E3E),
+  'media' => const Color(0xFFB26A00),
+  'baja' => const Color(0xFFC62828),
+  _ => null,
+};
+
 // ================================================================ LISTA
 class ListPage extends StatelessWidget {
   const ListPage({super.key});
@@ -924,9 +933,10 @@ class ItemRow extends StatelessWidget {
             ? null
             : Text(
                 eur(item.total),
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w600,
-                  fontFeatures: [FontFeature.tabularFigures()],
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  color: colorConfianza(s.confPrecio[item.id]),
                 ),
               ),
       ),
@@ -1205,7 +1215,10 @@ Future<void> showStoreSheet(
                     opts[i].price == null
                         ? 'sin precio'
                         : '${eur(opts[i].price!)}${opts[i].price == cheapest ? ' 💚' : ''}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: colorConfianza(opts[i].quote?.conf?.name),
+                    ),
                   ),
                   onTap: () {
                     s.assign(it, opts[i]);

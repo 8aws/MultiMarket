@@ -163,7 +163,9 @@ const demoCatalog = <Product>[
 
 Quote? demoQuote(Product p, String chain) {
   final v = demoPrices[p.name.toLowerCase()]?[chain];
-  return v == null ? null : Quote(v, _demoDate, QuoteSource.ejemplo);
+  return v == null
+      ? null
+      : Quote(v, _demoDate, QuoteSource.ejemplo, conf: Confianza.baja);
 }
 
 /// Tiendas de ejemplo (Madrid centro) cuando no hay ubicación ni red.
@@ -264,7 +266,12 @@ Future<Map<String, Quote>> openPrices(String barcode) async {
     if (chain == null || price == null || date == null) continue;
     final prev = out[chain];
     if (prev == null || date.isAfter(prev.date)) {
-      out[chain] = Quote(price, date, QuoteSource.openPrices);
+      out[chain] = Quote(
+        price,
+        date,
+        QuoteSource.openPrices,
+        conf: Confianza.media, // colaborativo y sin verificar
+      );
     }
   }
   return out;

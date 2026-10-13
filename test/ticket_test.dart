@@ -44,6 +44,35 @@ void main() {
     );
 
     test(
+      'Carrefour: importe en la línea siguiente, página que corta y «N ART. TOTAL A PAGAR»',
+      () {
+        final t = parsearTicket(leer('carrefour'));
+        expect(t.cadena, 'carrefour');
+        expect(t.lineas, hasLength(13));
+        expect(t.total, 46.03);
+        expect(
+          t.cuadra,
+          isTrue,
+          reason: 'bruto ${t.sumaBruta} neto ${t.sumaNeta} total ${t.total}',
+        );
+        final cola = t.lineas.first;
+        expect(cola.cantidad, 6);
+        expect(cola.unitario, 2.89);
+        expect(cola.bruto, 17.34);
+        expect(cola.descuento, -4.34);
+        final jamon = t.lineas.firstWhere((l) => l.nombre.startsWith('JAMON'));
+        expect(jamon.cantidad, 3);
+        expect(jamon.bruto, 6.00);
+        expect(
+          t.lineas.any(
+            (l) => l.nombre.contains('VENTAJAS') || l.nombre.contains('CLUB'),
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    test(
       'MÁS: cantidad × unitario = importe, códigos internos y descuento GLOBAL al final',
       () {
         final t = parsearTicket(leer('mas'));
