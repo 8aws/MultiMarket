@@ -19,6 +19,10 @@ Al importar o escanear un ticket **después** de haber comprado:
 - Mostrar valores de Open Food Facts en la ficha (por 100 g / 100 ml; extrapolar al envase) y Nutri-Score.
 - Después: comparar por nutriente («más proteína por euro»).
 
+## Diseño adaptativo (iPhone Duo, iPad, escritorio)
+Estudio en `docs/DISENO_ADAPTATIVO.md`: clases de tamaño, maestro-detalle (lista + ficha), modo compra y comparar en dos
+columnas, conciencia de pliegue cuando exista el SDK 27.1, y un widget (WidgetKit) como posible vía para HomeView.
+
 ## Más adelante (pendiente de decidir)
 - **Reconocimiento avanzado en el servidor** (tickets y etiquetas nutricionales): cola asíncrona con modelo propio
   (OpenVINO sobre iGPU/NPU), aviso con la imagen y los valores para validar, referencia siempre por 100 g. Requiere
