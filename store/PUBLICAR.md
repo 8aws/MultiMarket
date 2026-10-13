@@ -7,7 +7,8 @@ App Store Connect, que haces tú con tu cuenta.
 | Campo | Valor |
 |---|---|
 | Bundle ID | `es.uverse.multimarket` |
-| Nombre visible | MultiMarket |
+| Nombre bajo el icono | MultiMarket |
+| Nombre en la App Store | MultiMarket: Lista de súper |
 | Versión / build | 1.0.0 (1) — súbele el build en cada envío: `flutter build ipa --release --export-method app-store --build-number=2` |
 | iOS mínimo | 16.0 |
 | Dispositivos | solo iPhone (no pide capturas de iPad) |
@@ -21,7 +22,7 @@ App Store Connect, que haces tú con tu cuenta.
 2. Tu **Team ID** ya está en `ios/Flutter/Signing.xcconfig` (ignorado por Git), que es lo que usa la firma automática.
 
 ## 3. Crear la app en App Store Connect (My Apps → +)
-- **Plataformas:** iOS · **Nombre:** `MultiMarket` (si estuviera ocupado: `MultiMarket: lista de la compra`)
+- **Plataformas:** iOS · **Nombre:** `MultiMarket: Lista de súper` (aceptado; «MultiMarket» a secas ya existe). Bajo el icono sigue saliendo «MultiMarket»
 - **Idioma principal:** español (España) · **Bundle ID:** `es.uverse.multimarket`
 - **SKU:** `multimarket-ios-001` · **Acceso:** completo
 

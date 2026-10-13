@@ -2,7 +2,7 @@
 
 > La interfaz de la app está solo en español; la ficha en inglés debe decirlo claramente (ver el último párrafo de la descripción).
 
-**Name** (max 30): `MultiMarket`
+**Name** (max 30): `MultiMarket: Lista de súper` (same as Spanish: the store name must be unique, so keep one name in both)
 **Subtitle** (max 30): `Shop smart across stores`
 **Promotional text** (max 170): `One shopping list for all your supermarkets: the app picks where to buy each item by price, distance and your preferences. Free, open source, no ads.`
 **Keywords** (max 100): `shopping list,grocery,supermarket,prices,savings,shared list,spain,barcode,offers,cold chain`

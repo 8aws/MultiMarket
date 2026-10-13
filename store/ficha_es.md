@@ -1,9 +1,9 @@
 # Ficha de la App Store · Español (España)
 
-**Nombre** (máx. 30): `MultiMarket`
-**Subtítulo** (máx. 30): `La lista que elige el súper`
+**Nombre** (máx. 30): `MultiMarket: Lista de súper`
+**Subtítulo** (máx. 30): `Compra donde más te conviene`
 **Texto promocional** (máx. 170): `Una sola lista para todos tus supermercados: la app elige dónde comprar cada producto según precio, cercanía y tus preferencias. Gratis, libre y sin publicidad.`
-**Palabras clave** (máx. 100): `lista compra,supermercado,precios,ahorro,lista compartida,ofertas,código barras,comparar,familia`
+**Palabras clave** (máx. 100): `supermercado,precios,ahorro,lista compartida,ofertas,código barras,comparar,familia,frío,compra`
 **Categoría principal:** Compras · **Secundaria:** Estilo de vida
 **URL de soporte:** https://multimarket.uverse.es/info/
 **URL de marketing:** https://multimarket.uverse.es/info/
