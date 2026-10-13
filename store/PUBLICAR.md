@@ -28,7 +28,9 @@ App Store Connect, que haces tú con tu cuenta.
 
 ## 4. Ficha (copiar y pegar)
 - Textos en español: `store/ficha_es.md` · en inglés (U.S./U.K.): `store/ficha_en.md`
-- Capturas iPhone 6,9″ (1320 × 2868): `store/capturas_iphone_6.9/1_lista.png … 5_oscuro.png`
+- Capturas iPhone: `store/capturas_iphone_6.3/` (**1206 × 2622**, tamaño que acepta App Store Connect ahora) y
+  `store/capturas_iphone_6.9/` (1320 × 2868). Sube las 5 de `6.3` en este orden: lista, tienda, menú, ficha, oscuro.
+  Las vistas previas (vídeo) son opcionales: 886 × 1920 o 1920 × 886.
 - Imagen de cabecera 21:9: `store/cabecera_3840x1646.png` · resultados de búsqueda 3:2: `store/busqueda_3840x2560.png`
 - URLs: soporte y marketing `https://multimarket.uverse.es/info/` · privacidad `https://multimarket.uverse.es/privacidad/`
 - **Categoría:** Compras (principal) y Estilo de vida · **Precio:** gratis · **Disponibilidad:** España (amplía luego si quieres)
