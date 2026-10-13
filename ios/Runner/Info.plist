@@ -33,7 +33,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>MultiMarket usa tu ubicación para mostrar los supermercados más cercanos.</string>
+	<string>MultiMarket usa tu ubicación mientras la usas, para mostrar los supermercados más cercanos y detectar en cuál estás.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>MultiMarket solo usa tu ubicación mientras la app está abierta, para mostrar los supermercados más cercanos y detectar en cuál estás. No la usa en segundo plano.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
