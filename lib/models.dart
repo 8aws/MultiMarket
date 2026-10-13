@@ -150,7 +150,7 @@ class Product {
   Product conCadena(String chain) => copyWith(ownChain: chain);
 }
 
-enum QuoteSource { openPrices, tu, ejemplo }
+enum QuoteSource { openPrices, tu, ejemplo, comunidad }
 
 const _months = [
   'ene',
@@ -192,6 +192,7 @@ class Quote {
     QuoteSource.openPrices => 'Open Prices',
     QuoteSource.tu => 'tú',
     QuoteSource.ejemplo => 'ejemplo',
+    QuoteSource.comunidad => 'comunidad',
   };
 
   String get age {
@@ -443,6 +444,7 @@ class Settings {
     this.recompra = true,
     this.enviarErrores = false,
     this.copiaPrivada = false,
+    this.compartirPrecios = true,
   }) : enabled = enabled ?? {},
        favChains = favChains ?? {};
 
@@ -464,6 +466,8 @@ class Settings {
   enviarErrores; // informes de errores anónimos al servidor (desactivado por defecto)
   bool
   copiaPrivada; // copia de la lista privada en el servidor (opcional, desactivada por defecto)
+  bool
+  compartirPrecios; // aportar a la base común los precios de tus tickets (anónimo)
   bool recompra; // sugerencias «fantasma» de reposición según tu historial
   bool
   detectarTienda; // al marcar comprado, usa la ubicación para saber en qué tienda estás
@@ -493,6 +497,7 @@ class Settings {
     'recompra': recompra,
     'enviarErrores': enviarErrores,
     'copiaPrivada': copiaPrivada,
+    'compartirPrecios': compartirPrecios,
   };
 
   factory Settings.fromJson(Map<String, dynamic> j) => Settings(
@@ -516,6 +521,7 @@ class Settings {
     recompra: j['recompra'] ?? true,
     enviarErrores: j['enviarErrores'] ?? false,
     copiaPrivada: j['copiaPrivada'] ?? false,
+    compartirPrecios: j['compartirPrecios'] ?? true,
   );
 }
 

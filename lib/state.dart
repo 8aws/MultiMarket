@@ -987,6 +987,35 @@ class AppState extends ChangeNotifier {
     if (b != null) _local['b:$b|$chain'] = q;
   }
 
+  final Map<String, (DateTime, List<Map<String, dynamic>>)> _comCache = {};
+
+  /// Precios de la comunidad para este producto (por clave exacta y por nombre). Cacheado 30 min; nunca bloquea.
+  Future<List<Map<String, dynamic>>> _preciosComunidad(Product p) async {
+    // las pruebas automáticas no consultan el servidor real
+    if (!kIsWeb && Platform.environment['FLUTTER_TEST'] == 'true') {
+      return const [];
+    }
+    final b = _claveBase(p);
+    final id = '${p.key}|${b ?? ''}';
+    final c = _comCache[id];
+    if (c != null && DateTime.now().difference(c.$1).inMinutes < 30) {
+      return c.$2;
+    }
+    try {
+      final r = await sync.api
+          .preciosComunidad(keys: [p.key], bases: [?b])
+          .timeout(const Duration(seconds: 4));
+      _comCache[id] = (DateTime.now(), r);
+      return r;
+    } catch (_) {
+      _comCache[id] = (
+        DateTime.now(),
+        const [],
+      ); // sin red: no insistir en cada repintado
+      return const [];
+    }
+  }
+
   Future<Map<String, Quote>> _quotes(Product p) async {
     final out = <String, Quote>{};
     if (cfg.demoPrices) {
@@ -1009,6 +1038,24 @@ class AppState extends ChangeNotifier {
         ).timeout(const Duration(seconds: 6), onTimeout: () => {});
         eq.forEach((chain, q) => out.putIfAbsent(chain, () => q));
       } catch (_) {}
+    }
+    // precios de la comunidad (tickets de otros usuarios): exactos y, si no, del mismo producto por nombre
+    for (final r in await _preciosComunidad(p)) {
+      final chain = r['chain'] as String;
+      final exacto = r['key'] != null;
+      final precio = (r['price'] as num).toDouble();
+      final fecha = DateTime.tryParse('${r['fecha']}') ?? DateTime.now();
+      if (exacto) {
+        out.putIfAbsent(
+          chain,
+          () => Quote(precio, fecha, QuoteSource.comunidad),
+        );
+      } else {
+        out.putIfAbsent(
+          chain,
+          () => Quote(precio, fecha, QuoteSource.comunidad, equivalente: true),
+        );
+      }
     }
     for (final s in stores) {
       final l = _local['${p.key}|${s.chain}'];
@@ -1346,6 +1393,7 @@ class AppState extends ChangeNotifier {
     final st = tienda ?? tiendaDeTicket(t);
     final ms = (t.fecha ?? DateTime.now()).millisecondsSinceEpoch;
     var marcados = 0;
+    final observaciones = <Map<String, dynamic>>[];
     for (var i = 0; i < cruces.length; i++) {
       final c = cruces[i], l = c.linea;
       final id = c.estado == EstadoCruce.seguro ? c.itemId : elegidos[i];
@@ -1378,6 +1426,20 @@ class AppState extends ChangeNotifier {
             : genericKey(fallbackName: nombre);
         if (b != null) _local['b:$b|${st.chain}'] = q;
       }
+      if (st != null && cfg.compartirPrecios) {
+        final f = DateTime.fromMillisecondsSinceEpoch(ms);
+        observaciones.add({
+          'key': key,
+          'base': it != null
+              ? _claveBase(productOf(it))
+              : genericKey(fallbackName: nombre),
+          'chain': st.chain,
+          'price': l.porPeso ? l.bruto : l.bruto / unidades,
+          'name': nombre,
+          'fecha':
+              '${f.year}-${f.month.toString().padLeft(2, '0')}-${f.day.toString().padLeft(2, '0')}',
+        });
+      }
       compras.add(
         Compra(
           id: PbApi.randomId(),
@@ -1395,6 +1457,9 @@ class AppState extends ChangeNotifier {
       if (it != null) marcados++;
     }
     changed();
+    if (observaciones.isNotEmpty) {
+      unawaited(sync.api.subirPrecios(observaciones).catchError((_) {}));
+    }
     return marcados;
   }
 

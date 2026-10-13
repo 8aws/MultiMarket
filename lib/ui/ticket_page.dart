@@ -171,6 +171,18 @@ class _TicketPageState extends State<TicketPage> {
             'Los precios se guardan solo en tu base.',
             style: TextStyle(color: cs.outline),
           ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Aportar los precios a la base común'),
+            subtitle: const Text(
+              'Anónimo: solo producto, cadena, precio y día. Ayuda a otros a comparar.',
+            ),
+            value: AppScope.of(context).cfg.compartirPrecios,
+            onChanged: (v) {
+              AppScope.of(context).cfg.compartirPrecios = v;
+              AppScope.of(context).changed();
+            },
+          ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,

@@ -411,6 +411,41 @@ class PbApi {
   }
 
   /// Propone un producto nuevo a la base general. Queda pendiente de moderación.
+  /// Aporta precios observados (p. ej. de un ticket) a la base común. Anónimo: el servidor guarda producto, cadena, precio y día.
+  Future<void> subirPrecios(List<Map<String, dynamic>> items) async {
+    for (var i = 0; i < items.length; i += 50) {
+      await call(
+        'POST',
+        '/api/mm/v1/precios',
+        body: {
+          'items': items.sublist(
+            i,
+            i + 50 > items.length ? items.length : i + 50,
+          ),
+        },
+      );
+    }
+  }
+
+  /// Precios agregados (mediana) de la comunidad por clave exacta y por clave «por nombre».
+  Future<List<Map<String, dynamic>>> preciosComunidad({
+    List<String> keys = const [],
+    List<String> bases = const [],
+  }) async {
+    // lectura pública: no necesita sesión (así no se crea una cuenta solo por consultar precios)
+    final r = await _raw(
+      'GET',
+      '/api/mm/v1/precios',
+      query: {
+        if (keys.isNotEmpty) 'keys': keys.join(','),
+        if (bases.isNotEmpty) 'bases': bases.join(','),
+      },
+    );
+    return [
+      for (final x in (r['items'] as List)) (x as Map).cast<String, dynamic>(),
+    ];
+  }
+
   /// Copia de la lista privada de esta cuenta (null si no hay).
   Future<Map<String, dynamic>?> copiaActual() async {
     await ensureAuth();
