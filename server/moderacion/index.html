@@ -203,7 +203,8 @@ async function descargarCopia(key) {
   window.open(`${API}/api/backups/${encodeURIComponent(key)}?token=${encodeURIComponent(t.data.token)}`, '_blank');
 }
 async function copiaPrevia() {
-  const nombre = 'pre_restauracion_' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.zip';
+  // PocketBase solo admite minúsculas, números, guiones y guion bajo en el nombre de una copia
+  const nombre = ('pre_restauracion_' + new Date().toISOString().replace(/[^0-9a-zA-Z]/g, '-').slice(0, 19) + '.zip').toLowerCase();
   const r = await api('/api/backups', { method: 'POST', body: { name: nombre } });
   return (r.status === 200 || r.status === 204) ? nombre : null;
 }
@@ -229,7 +230,7 @@ async function restaurarCopia(key, subida) {
   espera();
 }
 async function subirYRestaurar(file) {
-  const nombre = file.name.replace(/[^A-Za-z0-9_.@-]/g, '_');
+  const nombre = file.name.toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
   const fd = new FormData(); fd.append('file', file, nombre);
   const r = await fetch(`${API}/api/backups/upload`, { method: 'POST', headers: { Authorization: token }, body: fd });
   if (r.status !== 200 && r.status !== 204) {

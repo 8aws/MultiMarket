@@ -31,6 +31,12 @@ El código (hooks, migraciones, página de moderación y web) está en GitHub: `
 7. Comprobar: `/api/health`, una sincronización desde el iPhone, estado de copias en moderación.
 8. Reactivar/verificar el backup diario (Ajustes → Copias) y el pull del NAS.
 
+## Cómo se probó
+El 14/10/2026, en una instancia local de PocketBase 0.40.4 (Docker) con las migraciones del repositorio: se creó una copia, se
+descargó, se **vació** el volumen (instancia nueva), se creó un superusuario temporal, se subió el `.zip` desde la página de
+moderación y se restauró. Resultado: vuelve el superusuario original, desaparece el temporal, están los datos de la copia y
+no lo creado después. 22/22 comprobaciones por API y el flujo de la página (avisos, confirmación, copia previa) verificado.
+
 ## Notas
 - Las migraciones pendientes se aplican solas al arrancar tras restaurar una copia antigua.
 - Los dispositivos conservan su sesión: el token va firmado con una clave por usuario que también está en la copia.
