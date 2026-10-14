@@ -7,6 +7,7 @@ List<String> leer(String nombre) =>
     File('test/fixtures/tickets/$nombre.txt').readAsLinesSync();
 
 void main() {
+  ticketsSinTotalTests();
   group('tickets sintéticos con la estructura de cada cadena', () {
     test(
       'Lidl: descuentos por línea, peso DESPUÉS del producto y «unitario x cantidad»',
@@ -196,4 +197,21 @@ void main() {
       }
     }, skip: hay ? false : 'define MM_TICKETS para probar tickets reales');
   });
+}
+
+void ticketsSinTotalTests() {
+  test(
+    'un ticket cortado sin total no cuela saldos ni puntos como productos',
+    () {
+      final t = parsearTicket([
+        'CARREFOUR',
+        'PAN PUEBLO',
+        '1,60',
+        'SOCIO CLUB CARREFOUR(***): 18630608',
+        'Saldo acumulado a 13/10/2026: 20,53 €',
+        'P 13 QV021026_50V 2Q OCT 1,05',
+      ]);
+      expect(t.lineas.map((l) => l.nombre), ['PAN PUEBLO']);
+    },
+  );
 }

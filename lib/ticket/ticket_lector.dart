@@ -52,6 +52,8 @@ Future<List<List<String>>> _leerPdf(String ruta) async {
   await pdfrxFlutterInitialize();
   final doc = await PdfDocument.openFile(ruta);
   final out = <List<String>>[];
+  // un PDF con texto es UN ticket aunque tenga varias páginas (una línea puede cortarse entre páginas)
+  final textoPaginas = <String>[];
   try {
     for (final p in doc.pages) {
       final t = (await p.loadText())?.fullText ?? '';
@@ -60,7 +62,7 @@ Future<List<List<String>>> _leerPdf(String ruta) async {
           .map((l) => l.trim())
           .where((l) => l.isNotEmpty);
       if (lineas.join().length >= 40) {
-        out.add(lineas.toList());
+        textoPaginas.addAll(lineas);
         continue;
       }
       // página escaneada: se dibuja a imagen y se pasa por OCR
@@ -95,5 +97,6 @@ Future<List<List<String>>> _leerPdf(String ruta) async {
   } finally {
     await doc.dispose();
   }
+  if (textoPaginas.isNotEmpty) out.insert(0, textoPaginas);
   return out;
 }

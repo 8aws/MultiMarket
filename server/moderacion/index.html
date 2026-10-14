@@ -177,6 +177,26 @@ function recortar(f) {
   });
 }
 
+// ---------------------------------------------------------------- copias de seguridad
+let copias = { ok: false, lista: [], error: null };
+async function cargarCopias() {
+  const r = await api('/api/backups');
+  if (r.status !== 200) { copias = { ok: false, lista: [], error: r.data.message || ('Error ' + r.status) }; return; }
+  const lista = (r.data || []).filter(b => /\.zip$/i.test(b.key))
+    .map(b => ({ nombre: b.key, bytes: b.size, fecha: new Date(b.modified.replace(' ', 'T')) }))
+    .sort((a, b) => b.fecha - a.fecha);
+  copias = { ok: true, lista, error: null };
+}
+function estadoCopias() {
+  if (!copias.ok) return { nivel: 'mal', texto: 'No se pudo consultar las copias: ' + esc(copias.error || '') };
+  if (!copias.lista.length) return { nivel: 'mal', texto: 'No hay ninguna copia de seguridad' };
+  const u = copias.lista[0], horas = (Date.now() - u.fecha.getTime()) / 3600000;
+  const n = copias.lista.length, mb = (u.bytes / 1048576).toFixed(1);
+  if (horas > 30) return { nivel: 'mal', texto: `La última copia tiene ${Math.round(horas)} h (más de 30 h): ${esc(u.nombre)}` };
+  if (u.bytes < 100000) return { nivel: 'aviso', texto: `La última copia es muy pequeña (${mb} MB): revisar` };
+  return { nivel: 'ok', texto: `Copias al día: última hace ${Math.max(0, Math.round(horas))} h (${mb} MB) · ${n} guardadas` };
+}
+
 // ---------------------------------------------------------------- listado
 const filtroPend = encodeURIComponent("status='pending'");
 async function listar(col, filtro, extra = '') {
@@ -185,7 +205,7 @@ async function listar(col, filtro, extra = '') {
   return r;
 }
 async function cargar() {
-  const col = tab === 'productos' ? 'productos' : tab === 'reportes' ? 'reportes' : tab === 'errores' ? 'errores' : 'fotos';
+  const col = tab === 'productos' ? 'productos' : tab === 'reportes' ? 'reportes' : tab === 'errores' || tab === 'copias' ? 'errores' : 'fotos';
   const r = col === 'errores'
     ? await api('/api/collections/errores/records?sort=-created&perPage=100')
     : col === 'reportes'
@@ -194,6 +214,7 @@ async function cargar() {
   if (r.status === 401 || r.status === 403) return loginView('Sin permiso: entra con una cuenta de superusuario.');
   if (r.status !== 200) { $('#app').innerHTML = `<div class="login"><h1>Error</h1><p class="msg">${esc(r.data.message || r.status)}</p><button id="re">Reintentar</button> <button id="out">Salir</button></div>`; $('#re').onclick = cargar; $('#out').onclick = logout; return; }
   items = r.data.items || [];
+  await cargarCopias();
   const cnt = {};
   for (const [k, c, f] of [['fotos', 'fotos', filtroPend], ['productos', 'productos', filtroPend], ['reportes', 'reportes', encodeURIComponent("status='open'")], ['errores', 'errores', '']]) {
     const x = await api(`/api/collections/${c}/records?${f ? 'filter=' + f + '&' : ''}perPage=1`);
@@ -217,6 +238,11 @@ function pintar(cnt) {
       <div class="b"><h3>${esc(it.name)}</h3><div class="mut">${esc([it.brand, it.quantity].filter(Boolean).join(' · '))}</div>
       <div>${it.cold ? '<span class="tag">❄️ frío</span>' : ''}${it.own_chain ? `<span class="tag">exclusivo ${esc(it.own_chain)}</span>` : ''}<span class="tag">${esc(it.key)}</span></div>
       <div class="mut">equivalencia: ${esc(it.generic_key || '—')}</div>${botones(it.id)}</div></div>`).join('');
+  else if (tab === 'copias') {
+    cards = copias.ok ? `<table style="width:100%;border-collapse:collapse;font-size:14px"><tr><th align="left">Copia</th><th align="right">Fecha</th><th align="right">Tamaño</th></tr>${
+      copias.lista.map(b => `<tr><td>${esc(b.nombre)}</td><td align="right">${esc(b.fecha.toLocaleString('es-ES'))}</td><td align="right">${(b.bytes / 1048576).toFixed(2)} MB</td></tr>`).join('')
+    }</table><div class="mut" style="margin-top:8px">Se conservan 7 copias (una al día, 04:00). El NAS con RAID1 las descarga cada día y guarda 30.</div>` : '';
+  }
   else if (tab === 'errores') {
     const grupos = new Map();
     for (const e of items) { const k = (e.mensaje || '') + '|' + (e.version || ''); const g = grupos.get(k) || { e, n: 0 }; g.n++; grupos.set(k, g); }
@@ -231,10 +257,12 @@ function pintar(cnt) {
       <div class="mut">foto de: ${esc(f ? (f.name || f.key) : '(borrada)')} · estado ${esc(f ? f.status : '')}</div>
       <div class="row"><button class="bad" data-a="retirar" data-id="${it.id}" data-foto="${f ? f.id : ''}">Retirar foto</button><button data-a="dismissed" data-id="${it.id}">Descartar reporte</button></div></div></div>`; }).join('');
   $('#app').innerHTML = `<header><h1>Moderación</h1><button id="out">Salir</button></header>
-    <main><div class="tabs"><button id="t1" class="${tab === 'fotos' ? 'on' : ''}">Fotos (${cnt.fotos})</button>
+    <main>${(() => { const e = estadoCopias(); return `<div class="regla" style="border-left:4px solid ${e.nivel === 'ok' ? '#2e9d4f' : e.nivel === 'aviso' ? '#d9a300' : '#d33'}">${e.nivel === 'ok' ? '💾' : '⚠️'} ${e.texto}</div>`; })()}
+    <div class="tabs"><button id="t1" class="${tab === 'fotos' ? 'on' : ''}">Fotos (${cnt.fotos})</button>
     <button id="t2" class="${tab === 'productos' ? 'on' : ''}">Productos (${cnt.productos})</button>
     <button id="t3" class="${tab === 'reportes' ? 'on' : ''}">Reportes (${cnt.reportes})</button>
-    <button id="t4" class="${tab === 'errores' ? 'on' : ''}">Errores (${cnt.errores})</button></div>
+    <button id="t4" class="${tab === 'errores' ? 'on' : ''}">Errores (${cnt.errores})</button>
+    <button id="t5" class="${tab === 'copias' ? 'on' : ''}">Copias (${copias.lista.length})</button></div>
     ${tab === 'fotos' ? '<div class="regla">Solo fotos <b>puras de producto</b>: sin tickets, caras, dedos ni fondos con personas. Si está casi bien, <b>Ajustar</b> (girar y recortar). Al aprobar, la foto se reconstruye sin metadatos (EXIF/GPS) y se sustituye el archivo.</div>' : ''}
     ${items.length && (tab === 'fotos' || tab === 'productos') ? `<div class="row"><button class="ok" id="allok">Aprobar todo lo visible (${items.length})</button></div>` : ''}
     ${cards || '<div class="empty">Nada pendiente 🎉</div>'}</main>`;
@@ -243,6 +271,7 @@ function pintar(cnt) {
   $('#t2').onclick = () => { tab = 'productos'; cargar(); };
   $('#t3').onclick = () => { tab = 'reportes'; cargar(); };
   $('#t4').onclick = () => { tab = 'errores'; cargar(); };
+  $('#t5').onclick = () => { tab = 'copias'; cargar(); };
   document.querySelectorAll('[data-a]').forEach(b => b.onclick = () => accion(b));
   const all = $('#allok');
   if (all) all.onclick = async () => {

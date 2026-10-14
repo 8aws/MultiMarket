@@ -101,7 +101,12 @@ final _colaPrecioRe = RegExp(
   caseSensitive: false,
 );
 final _anclaFinRe = RegExp(
-  r'^\s*(total\b|\d+\s*art\.?\s*total|a pagar|suma\b|iva\b|desglose|entrega|subtotal|base\b)',
+  r'^\s*(total\b|\d+\s*art\.?\s*total|socio club|saldo acumulado|ventajas obtenidas|a pagar|suma\b|iva\b|desglose|entrega|subtotal|base\b)',
+  caseSensitive: false,
+);
+// Líneas con importe que NO son productos (saldos, puntos, club, tarjeta, cambio…).
+final _noProductoRe = RegExp(
+  r'\b(saldo|acumulado|socio|club|puntos|ventajas|cambio|efectivo|tarjeta|visa|mastercard|importe|entregado|devoluci[oó]n|ahorro|iva|cuota|base imponible)\b',
   caseSensitive: false,
 );
 final _descuentoRe = RegExp(
@@ -322,6 +327,7 @@ Ticket parsearTicket(List<String> crudas) {
       if (imp < 0 || _descuentoRe.hasMatch(nombre)) {
         toks.add(_Tok(_Tipo.descuento, importe: imp < 0 ? imp : -imp));
       } else if (nombre.length >= 2 &&
+          !_noProductoRe.hasMatch(nombre) &&
           !RegExp(r'^[\d\s.,€£/-]+$').hasMatch(nombre)) {
         toks.add(
           _Tok(
