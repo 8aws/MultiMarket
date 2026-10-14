@@ -63,8 +63,10 @@ acciones con título y símbolo; la acción más usada («Voy yo», escáner) co
 Esfuerzo orientativo: fases 1–3 ≈ 4–6 días; fase 4 ≈ 2–3 días; fase 5 ≈ 1–3 días (según API y paquete); fase 6 depende
 de las herramientas. Riesgo: replicar a mano lo que UIKit/SwiftUI dan gratis; mitigarlo empezando por lo que no depende de APIs nuevas.
 
-## 5. HomeView (pantalla de hogar con Siri) — sin verificar
-Aún no he podido confirmarlo en ninguna fuente. Si existe y admite apps de terceros o widgets:
+## 5. HomeView (pantalla de hogar con Siri)
+No he podido confirmarlo en fuentes públicas. Dato aportado por el propietario (14/10/2026): internamente funciona como un
+**destino de CarPlay**, con widgets y audio de CarPlay. Es decir, el camino sería el de CarPlay (plantillas, no interfaz libre)
+más widgets; encaja con el widget propuesto y con avisos de voz. Para el futuro:
 - **Widget** (WidgetKit) «Lista de la compra»: extensión nativa en Swift + *App Group*; sirve en iPhone, iPad y, probablemente, HomeView.
 - **De lejos:** lo que falta, en letra grande y solo lectura, agrupado por tienda; al acercarse, el detalle.
 - **Un perfil por persona** encaja con nuestras listas (privada de cada uno + compartidas del hogar).
