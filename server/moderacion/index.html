@@ -197,6 +197,48 @@ function estadoCopias() {
   return { nivel: 'ok', texto: `Copias al día: última hace ${Math.max(0, Math.round(horas))} h (${mb} MB) · ${n} guardadas` };
 }
 
+async function descargarCopia(key) {
+  const t = await api('/api/files/token', { method: 'POST' });
+  if (t.status !== 200) return alert('No se pudo preparar la descarga: ' + (t.data.message || t.status));
+  window.open(`${API}/api/backups/${encodeURIComponent(key)}?token=${encodeURIComponent(t.data.token)}`, '_blank');
+}
+async function copiaPrevia() {
+  const nombre = 'pre_restauracion_' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.zip';
+  const r = await api('/api/backups', { method: 'POST', body: { name: nombre } });
+  return (r.status === 200 || r.status === 204) ? nombre : null;
+}
+async function restaurarCopia(key, subida) {
+  const aviso = subida
+    ? `Vas a RESTAURAR la copia «${key}».`
+    : `Vas a RESTAURAR la copia «${key}» del servidor.`;
+  if (!confirm(aviso + '\n\nSe perderán TODOS los datos creados después de esa copia (usuarios, listas, fotos, productos). ' +
+      'Antes se guardará una copia del estado actual.\n\n¿Continuar?')) return;
+  const previa = await copiaPrevia();
+  if (!previa && !confirm('No se pudo guardar la copia previa del estado actual. ¿Restaurar de todos modos?')) return;
+  const r = await api(`/api/backups/${encodeURIComponent(key)}/restore`, { method: 'POST' });
+  if (r.status !== 200 && r.status !== 204) return alert('No se pudo restaurar: ' + (r.data.message || r.status));
+  $('#app').innerHTML = `<div class="login"><h1>Restaurando…</h1><p>El servidor se está reiniciando con la copia. Esta página volverá a cargarse sola.</p><p class="mut">${previa ? 'Copia previa guardada: ' + esc(previa) : ''}</p></div>`;
+  token = ''; sessionStorage.removeItem('mm_tok');
+  const espera = async () => {
+    for (let i = 0; i < 60; i++) {
+      await new Promise(res => setTimeout(res, 2000));
+      try { const h = await fetch(API + '/api/health', { cache: 'no-store' }); if (h.ok && i > 2) return location.reload(); } catch (_) {}
+    }
+    location.reload();
+  };
+  espera();
+}
+async function subirYRestaurar(file) {
+  const nombre = file.name.replace(/[^A-Za-z0-9_.@-]/g, '_');
+  const fd = new FormData(); fd.append('file', file, nombre);
+  const r = await fetch(`${API}/api/backups/upload`, { method: 'POST', headers: { Authorization: token }, body: fd });
+  if (r.status !== 200 && r.status !== 204) {
+    let m = ''; try { m = (await r.json()).message || ''; } catch (_) {}
+    return alert('No se pudo subir la copia: ' + (m || r.status));
+  }
+  await restaurarCopia(nombre, true);
+}
+
 // ---------------------------------------------------------------- listado
 const filtroPend = encodeURIComponent("status='pending'");
 async function listar(col, filtro, extra = '') {
@@ -239,9 +281,16 @@ function pintar(cnt) {
       <div>${it.cold ? '<span class="tag">❄️ frío</span>' : ''}${it.own_chain ? `<span class="tag">exclusivo ${esc(it.own_chain)}</span>` : ''}<span class="tag">${esc(it.key)}</span></div>
       <div class="mut">equivalencia: ${esc(it.generic_key || '—')}</div>${botones(it.id)}</div></div>`).join('');
   else if (tab === 'copias') {
-    cards = copias.ok ? `<table style="width:100%;border-collapse:collapse;font-size:14px"><tr><th align="left">Copia</th><th align="right">Fecha</th><th align="right">Tamaño</th></tr>${
-      copias.lista.map(b => `<tr><td>${esc(b.nombre)}</td><td align="right">${esc(b.fecha.toLocaleString('es-ES'))}</td><td align="right">${(b.bytes / 1048576).toFixed(2)} MB</td></tr>`).join('')
-    }</table><div class="mut" style="margin-top:8px">Se conservan 7 copias (una al día, 04:00). El NAS con RAID1 las descarga cada día y guarda 30.</div>` : '';
+    cards = copias.ok ? `<table style="width:100%;border-collapse:collapse;font-size:14px"><tr><th align="left">Copia</th><th align="right">Fecha</th><th align="right">Tamaño</th><th></th></tr>${
+      copias.lista.map(b => `<tr><td>${esc(b.nombre)}</td><td align="right">${esc(b.fecha.toLocaleString('es-ES'))}</td><td align="right">${(b.bytes / 1048576).toFixed(2)} MB</td>
+        <td align="right" style="white-space:nowrap"><button class="cp-down" data-k="${esc(b.nombre)}">Descargar</button> <button class="bad cp-rest" data-k="${esc(b.nombre)}">Restaurar</button></td></tr>`).join('')
+    }</table><div class="mut" style="margin:8px 0 18px">Se conservan 7 copias (una al día, 04:00). El NAS con RAID1 las descarga cada día y guarda 30.</div>
+    <div class="regla" style="border-left:4px solid #d33"><b>Restaurar desde un archivo</b> (p. ej. una copia del NAS tras reinstalar los contenedores).
+      <br>Baja el <code>.zip</code> desde el NAS a este ordenador, elígelo aquí y escribe <b>RESTAURAR</b>. <b>Sustituye todos los datos actuales</b>
+      por los de la copia (usuarios, listas, fotos, productos y ajustes). Antes se guarda automáticamente una copia del estado actual.
+      Después el servidor se reinicia solo (unos segundos) y tendrás que volver a entrar.</div>
+    <div class="row"><input type="file" id="cp-file" accept=".zip"><input id="cp-conf" placeholder="Escribe RESTAURAR" autocomplete="off">
+      <button class="bad" id="cp-go">Restaurar desde este archivo</button></div>` : '';
   }
   else if (tab === 'errores') {
     const grupos = new Map();
@@ -272,6 +321,16 @@ function pintar(cnt) {
   $('#t3').onclick = () => { tab = 'reportes'; cargar(); };
   $('#t4').onclick = () => { tab = 'errores'; cargar(); };
   $('#t5').onclick = () => { tab = 'copias'; cargar(); };
+  document.querySelectorAll('.cp-down').forEach(b => b.onclick = () => descargarCopia(b.dataset.k));
+  document.querySelectorAll('.cp-rest').forEach(b => b.onclick = () => restaurarCopia(b.dataset.k, false));
+  const cpGo = $('#cp-go');
+  if (cpGo) cpGo.onclick = () => {
+    const f = $('#cp-file').files[0];
+    if (!f) return alert('Elige primero el archivo .zip de la copia.');
+    if (!/\.zip$/i.test(f.name)) return alert('La copia debe ser un archivo .zip de PocketBase.');
+    if (($('#cp-conf').value || '').trim() !== 'RESTAURAR') return alert('Escribe RESTAURAR para confirmar.');
+    subirYRestaurar(f);
+  };
   document.querySelectorAll('[data-a]').forEach(b => b.onclick = () => accion(b));
   const all = $('#allok');
   if (all) all.onclick = async () => {
