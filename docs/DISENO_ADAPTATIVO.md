@@ -77,3 +77,20 @@ más widgets; encaja con el widget propuesto y con avisos de voz. Para el futuro
 3. Barras laterales y regiones reservadas después, con la API real documentada.
 4. Widget como pieza independiente.
 5. Para *early adopters*: mencionarlo en la ficha solo cuando esté probado en un dispositivo real.
+
+## 7. Primeras pruebas en el simulador de iPhone Duo (15/10/2026)
+Entorno: Xcode 27.0 + runtime iOS 27.2, dispositivo «iPhone Duo» del simulador. La app se instaló desde una copia sin
+`google_mlkit_text_recognition` (ML Kit no tiene versión para simulador arm64). Datos de ejemplo.
+- **Pantalla exterior:** 466 × 678 pt (1398 × 2034 px a 3×). La app se ejecuta como app de iPhone normal.
+- **Barra de estado a un lado:** el sistema mueve hora y estado de red/batería a una **tira vertical a la derecha** (~17 % del ancho)
+  y recorta el contenido con esquina redondeada. Flutter respeta esa zona: **nada queda debajo de la tira**.
+- **Nuestras barras** (AppBar y menú propios) siguen horizontales arriba. Funciona, pero no sigue el patrón del sistema.
+- **Hallazgos a corregir:**
+  1. El botón «+» tapa el importe de las últimas filas (también pasa en iPhone con la lista larga).
+  2. Los filtros («Todo / Solo fríos / Sin refrigerar») quedan cortados por el borde; se desplazan, pero «Sin refrigerar» se corta.
+  3. La **ficha** (hoja modal) ocupa toda la altura y su último bloque (tienda) queda cortado hasta hacer scroll.
+  4. Con el ancho mayor, la lista queda con mucho aire entre nombre e importe: mejor candidata a dos paneles.
+- **Pendiente de probar:** pantalla interior abierta y poses parcialmente plegadas (el simulador expone dos pantallas; la
+  interior sale en negro con el dispositivo cerrado). Requiere el control de pose de Device Hub (interfaz gráfica).
+- **Aviso práctico:** los dos simuladores iPhone Duo se comparten entre hilos de trabajo (MultiMarket, OneDay, LoyWallet,
+  uFeed); usar uno distinto por proyecto para no pisarse.
