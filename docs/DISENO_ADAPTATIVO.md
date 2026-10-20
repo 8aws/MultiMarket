@@ -94,3 +94,17 @@ Entorno: Xcode 27.0 + runtime iOS 27.2, dispositivo «iPhone Duo» del simulador
   interior sale en negro con el dispositivo cerrado). Requiere el control de pose de Device Hub (interfaz gráfica).
 - **Aviso práctico:** los dos simuladores iPhone Duo se comparten entre hilos de trabajo (MultiMarket, OneDay, LoyWallet,
   uFeed); usar uno distinto por proyecto para no pisarse.
+
+## 8. Primera implementación (20/10/2026, versión 1.1.0)
+Hecho (fases 1–3 del plan, sin depender de APIs nuevas):
+- `lib/ui/adaptativo.dart`: clases de tamaño por ancho (compacta < 600, media < 840, expandida) y umbral de **dos paneles a 700 dp**.
+- La **ficha de producto** es ahora un widget reutilizable (`FichaProducto`): hoja modal en pantallas estrechas y **panel fijo** en las anchas.
+- **Pantalla principal en dos paneles** (lista 5/9 · detalle 4/9) con el producto elegido resaltado; en pantallas estrechas todo sigue igual.
+- Los **filtros** (Todo / Solo fríos / Sin refrigerar) pasan a otra línea en lugar de cortarse; la hoja usa `useSafeArea`.
+- Pruebas: tests de widget a 1000 y 420 px (panel vs hoja) y comprobación visual en el navegador a 900 px.
+
+Pendiente: barras laterales propias (fase 4), puente nativo de regiones reservadas (fase 5), modo compra y comparar en dos columnas,
+historial y ajustes en maestro-detalle. **Pantalla interior del iPhone Duo:** en el simulador se pueden encender/apagar las pantallas
+(`xcrun simctl io <dispositivo> screenConfig --display=primary-1 power on`; `primary` = exterior 1398×2034, `primary-1` = interior
+2007×2853), pero la captura de la interior falla y no se puede cambiar la pose desde la línea de comandos: hay que usar la interfaz
+de Device Hub. Con el ancho de la interior (≈ 670 pt @3x) el diseño de dos paneles se activaría (umbral 700 dp); **falta medirlo**.

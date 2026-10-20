@@ -9,7 +9,7 @@ Lo de la 1.0 está en el README. Aquí queda lo acordado para versiones posterio
   entiende tablas de Supercor/El Corte Inglés, pesos sin «EUR/kg», totales sin etiqueta (fila «Suma» / «IMP.»), letras de IVA mal
   leídas y nombres perdidos; las líneas se pueden **corregir, quitar o añadir a mano** antes de aplicar.
 
-## 1.1 · Ticket después de la compra (casar con la lista)
+## 1.2 · Ticket después de la compra (casar con la lista)
 Al importar o escanear un ticket **después** de haber comprado:
 1. **Casar con la lista, también con lo ya marcado como comprado** (hoy y ayer): rellenar precio, cantidad y tienda reales
    del ticket en los productos ya marcados, y marcar como comprados —con el precio del ticket— los que se quedaron
@@ -22,9 +22,12 @@ Al importar o escanear un ticket **después** de haber comprado:
 7. **Resumen de ahorro:** lo pagado frente a la opción más barata que habría propuesto la app.
 8. **Foto del ticket con la cámara** (`permitirFotoTicket`) cuando el OCR de fotos sea fiable.
 
-## 1.2 · Información nutricional (fase 1, tras la beta)
-- Mostrar valores de Open Food Facts en la ficha (por 100 g / 100 ml; extrapolar al envase) y Nutri-Score.
-- Después: comparar por nutriente («más proteína por euro»).
+## 1.1 · Información nutricional y diseño adaptativo (20/10/2026)
+- **Hecho:** sección «Información nutricional» en la ficha (Open Food Facts, por 100 g / 100 ml y por envase), Nutri-Score y NOVA,
+  con la nota de que son datos colaborativos. Cache de 30 días; solo se muestra si el producto tiene código de barras y datos.
+- **Hecho:** dos paneles (lista + ficha) en pantallas anchas, filtros que no se cortan (ver `docs/DISENO_ADAPTATIVO.md`).
+- Después: comparar por nutriente («más proteína por euro»), nutrición en el modo compra y en el comparador; importar etiquetas
+  (ver «Más adelante»).
 
 ## Emplazamientos de compra (idea, sin diseñar)
 Poder organizar los supermercados **por lugares** que el usuario define: «cerca de casa», «cerca del trabajo», «cerca del gimnasio»,

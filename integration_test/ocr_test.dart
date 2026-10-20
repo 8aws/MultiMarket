@@ -81,10 +81,10 @@ void main() {
     for (var i = 1; i <= 40; i++) {
       final p = 0.50 + i * 0.37;
       total += p;
-      lineas.add(
-        'PRODUCTO NUMERO ${i.toString().padLeft(2, '0')}'.padRight(28) +
-            '${p.toStringAsFixed(2).replaceAll('.', ',')} A',
+      final nombre = 'PRODUCTO NUMERO ${i.toString().padLeft(2, '0')}'.padRight(
+        28,
       );
+      lineas.add('$nombre${p.toStringAsFixed(2).replaceAll('.', ',')} A');
     }
     final tot = total.toStringAsFixed(2).replaceAll('.', ',');
     lineas.addAll(['TOTAL'.padRight(28) + tot, 'ENTREGA'.padRight(28) + tot]);

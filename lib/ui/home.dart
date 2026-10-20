@@ -8,6 +8,7 @@ import '../main.dart';
 import '../models.dart';
 import '../sources.dart';
 import '../state.dart';
+import 'adaptativo.dart';
 import 'ficha.dart';
 import 'ticket_page.dart';
 import '../catalog.dart';
@@ -147,7 +148,16 @@ class _HomePageState extends State<HomePage> {
       body: SafeArea(
         top: false,
         child: switch (s.tab) {
-          0 => const ListPage(),
+          0 =>
+            dosPaneles(context)
+                ? const Row(
+                    children: [
+                      Expanded(flex: 5, child: ListPage()),
+                      VerticalDivider(width: 1),
+                      Expanded(flex: 4, child: PanelDetalle()),
+                    ],
+                  )
+                : const ListPage(),
           1 => const OffersPage(),
           3 => const HistorialPage(),
           _ => const SettingsPage(),
@@ -277,6 +287,36 @@ class AppDrawer extends StatelessWidget {
   }
 }
 
+/// Panel de detalle (pantallas anchas): ficha del producto elegido en la lista.
+class PanelDetalle extends StatelessWidget {
+  const PanelDetalle({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final it = s.seleccionado;
+    if (it == null || !s.allItems.contains(it)) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'Elige un producto de la lista para ver y editar su ficha.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Theme.of(context).colorScheme.outline),
+          ),
+        ),
+      );
+    }
+    return FichaProducto(
+      key: ValueKey(it.id),
+      s: s,
+      it: it,
+      enPanel: true,
+      onCambiarTienda: () => _changeStore(context, s, it),
+    );
+  }
+}
+
 /// Color del importe según la confianza del precio: negro = escrito a mano, verde = fiable,
 /// ámbar = disparidad o fuente menos fiable, rojo = pocos datos o poco fiable.
 Color? colorConfianza(String? conf) => switch (conf) {
@@ -366,28 +406,25 @@ class ListPage extends StatelessWidget {
         const ExpiringOffersBanner(),
         if (s.cfg.showCartCard) const CartCard(),
         const SizedBox(height: 6),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (final e in const {
-                ColdFilter.todo: 'Todo',
-                ColdFilter.frio: '❄️ Solo fríos',
-                ColdFilter.seco: '🧺 Sin refrigerar',
-              }.entries)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(e.value),
-                    selected: s.filter == e.key,
-                    onSelected: (_) {
-                      s.filter = e.key;
-                      s.refresh();
-                    },
-                  ),
-                ),
-            ],
-          ),
+        Wrap(
+          spacing: 8,
+          runSpacing:
+              0, // en pantallas estrechas los filtros pasan a otra línea en lugar de cortarse
+          children: [
+            for (final e in const {
+              ColdFilter.todo: 'Todo',
+              ColdFilter.frio: '❄️ Solo fríos',
+              ColdFilter.seco: '🧺 Sin refrigerar',
+            }.entries)
+              ChoiceChip(
+                label: Text(e.value),
+                selected: s.filter == e.key,
+                onSelected: (_) {
+                  s.filter = e.key;
+                  s.refresh();
+                },
+              ),
+          ],
         ),
         if (items.isEmpty)
           Padding(
@@ -815,12 +852,17 @@ class ItemRow extends StatelessWidget {
       ),
       onDismissed: (_) => s.remove(item),
       child: ListTile(
-        onTap: () => showFicha(
-          context,
-          s,
-          item,
-          onCambiarTienda: () => _changeStore(context, s, item),
-        ),
+        selected: dosPaneles(context) && s.seleccionado == item,
+        onTap: () => dosPaneles(context)
+            ? s.seleccionar(
+                item,
+              ) // pantalla ancha: la ficha se abre en el panel de la derecha
+            : showFicha(
+                context,
+                s,
+                item,
+                onCambiarTienda: () => _changeStore(context, s, item),
+              ),
         onLongPress: () => showOfferDialog(
           context,
           s,

@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 
 import 'catalog.dart';
 import 'models.dart';
+import 'nutricion.dart';
 
 const _ua = {
   'User-Agent':
@@ -225,6 +226,27 @@ Future<List<Product>> searchProducts(String q) async {
 }
 
 /// Un producto por su código de barras (EAN/UPC).
+/// Información nutricional (por 100 g / 100 ml) de un producto de Open Food Facts por su código de barras.
+/// null = el producto no existe o no tiene datos nutricionales.
+Future<Nutricion?> nutricionPorCodigo(
+  String code, {
+  http.Client? cliente,
+}) async {
+  final uri = Uri.https(
+    'world.openfoodfacts.org',
+    '/api/v2/product/$code.json',
+    {'fields': 'nutriments,nutriscore_grade,nova_group,serving_size,quantity'},
+  );
+  final r = await (cliente ?? http.Client())
+      .get(uri, headers: _ua)
+      .timeout(const Duration(seconds: 10));
+  if (r.statusCode != 200) return null;
+  final j = jsonDecode(r.body) as Map<String, dynamic>;
+  if (j['status'] != 1) return null;
+  final n = Nutricion.fromOff((j['product'] as Map).cast<String, dynamic>());
+  return n.hayDatos ? n : null;
+}
+
 Future<Product?> productByBarcode(String code) async {
   final uri = Uri.https(
     'world.openfoodfacts.org',

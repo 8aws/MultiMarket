@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'catalog.dart' show genericKey;
 import 'models.dart';
 import 'notifier.dart';
+import 'nutricion.dart';
 import 'recompra.dart';
 import 'sources.dart';
 import 'sync/pb_api.dart';
@@ -530,6 +531,49 @@ class AppState extends ChangeNotifier {
       _prefs.remove('copiaFecha');
       _copiaHash = '';
     } catch (_) {}
+  }
+
+  // ------------------------------------------------------------- selección (panel de detalle)
+  /// Producto abierto en el panel de detalle (pantallas anchas). null = ninguno.
+  Item? seleccionado;
+
+  void seleccionar(Item? it) {
+    seleccionado = it;
+    notifyListeners();
+  }
+
+  // ------------------------------------------------------ información nutricional
+  final Map<String, (int, Nutricion?)> _nutri =
+      {}; // código → (ms de la consulta, datos o null si no hay)
+
+  /// Información nutricional del producto (Open Food Facts), cacheada 30 días. null si no hay código o no hay datos.
+  Future<Nutricion?> nutricionDe(String? codigo) async {
+    if (codigo == null || !RegExp(r'^\d{8,14}$').hasMatch(codigo)) return null;
+    final c = _nutri[codigo];
+    final ahora = DateTime.now().millisecondsSinceEpoch;
+    if (c != null && ahora - c.$1 < 30 * 86400000) return c.$2;
+    final raw = _prefs.getString('nutri:$codigo');
+    if (raw != null) {
+      final j = jsonDecode(raw) as Map<String, dynamic>;
+      if (ahora - (j['t'] as int) < 30 * 86400000) {
+        final n = j['d'] == null
+            ? null
+            : Nutricion.fromJson((j['d'] as Map).cast<String, dynamic>());
+        _nutri[codigo] = (j['t'] as int, n);
+        return n;
+      }
+    }
+    try {
+      final n = await nutricionPorCodigo(codigo);
+      _nutri[codigo] = (ahora, n);
+      _prefs.setString(
+        'nutri:$codigo',
+        jsonEncode({'t': ahora, 'd': n?.toJson()}),
+      );
+      return n;
+    } catch (_) {
+      return null; // sin red: no se guarda, se reintenta la próxima vez
+    }
   }
 
   // ------------------------------------------------------ informes de errores

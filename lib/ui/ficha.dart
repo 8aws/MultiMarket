@@ -7,6 +7,7 @@ import 'foto.dart';
 import '../sources.dart';
 import '../sync/pb_api.dart';
 import '../state.dart';
+import 'nutricion_view.dart';
 
 const _urgColors = [Color(0xFFFF3B30), Color(0xFFFF9500), Color(0xFF8E8E93)];
 
@@ -20,29 +21,34 @@ Future<void> showFicha(
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     builder: (ctx) => Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
       child: SafeArea(
-        child: _Ficha(s: s, it: it, onCambiarTienda: onCambiarTienda),
+        child: FichaProducto(s: s, it: it, onCambiarTienda: onCambiarTienda),
       ),
     ),
   );
 }
 
-class _Ficha extends StatefulWidget {
-  const _Ficha({
+/// Ficha de un producto: en una hoja modal (pantallas estrechas) o fija en un panel (pantallas anchas).
+class FichaProducto extends StatefulWidget {
+  const FichaProducto({
+    super.key,
     required this.s,
     required this.it,
     required this.onCambiarTienda,
+    this.enPanel = false,
   });
+  final bool enPanel;
   final AppState s;
   final Item it;
   final VoidCallback onCambiarTienda;
   @override
-  State<_Ficha> createState() => _FichaState();
+  State<FichaProducto> createState() => _FichaState();
 }
 
-class _FichaState extends State<_Ficha> {
+class _FichaState extends State<FichaProducto> {
   late final TextEditingController _precio;
   bool _oferta = false;
   DateTime? _hasta;
@@ -312,6 +318,7 @@ class _FichaState extends State<_Ficha> {
                   },
                 ),
               ),
+            SeccionNutricion(s: widget.s, codigo: widget.it.barcode),
             const Divider(),
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -320,7 +327,9 @@ class _FichaState extends State<_Ficha> {
               subtitle: st == null ? null : Text(prettyChain(st.chain)),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
-                Navigator.pop(context);
+                if (!widget.enPanel) {
+                  Navigator.pop(context); // en el panel no hay hoja que cerrar
+                }
                 widget.onCambiarTienda();
               },
             ),

@@ -449,7 +449,7 @@ class Aviso {
 }
 
 /// Versión de la app (mantener igual que `version` de pubspec.yaml); se añade a los informes de errores.
-const versionApp = '1.0.1+6';
+const versionApp = '1.1.0+7';
 
 class Settings {
   Settings({
