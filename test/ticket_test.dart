@@ -7,6 +7,7 @@ List<String> leer(String nombre) =>
     File('test/fixtures/tickets/$nombre.txt').readAsLinesSync();
 
 void main() {
+  ticketsRuidososTests();
   ticketsSinTotalTests();
   group('tickets sintéticos con la estructura de cada cadena', () {
     test(
@@ -197,6 +198,57 @@ void main() {
       }
     }, skip: hay ? false : 'define MM_TICKETS para probar tickets reales');
   });
+}
+
+void ticketsRuidososTests() {
+  test(
+    'Lidl con OCR ruidoso: nombres perdidos, letras de IVA mal leídas y total sin etiqueta',
+    () {
+      final t = parsearTicket(
+        File('test/fixtures/tickets/lidl_ocr_ruidoso.txt').readAsLinesSync(),
+      );
+      expect(t.cadena, 'lidl');
+      expect(
+        t.total,
+        52.80,
+        reason: 'sale de la fila «Suma» / «IMP.» aunque falten TOTAL y ENTREGA',
+      );
+      expect(t.cuadra, isTrue, reason: 'neto ${t.sumaNeta} total ${t.total}');
+      expect(t.lineas.where((l) => l.nombre == '(sin nombre)'), hasLength(2));
+      expect(t.lineas.every((l) => l.nombre != 'IMP'), isTrue);
+      final lomo = t.lineas.firstWhere((l) => l.nombre.startsWith('LOMO'));
+      expect(lomo.porPeso, isTrue, reason: 'peso sin «EUR/kg»');
+      expect(lomo.descuento, -0.93);
+      expect(
+        t.lineas.any((l) => l.nombre.startsWith('CHOCO') && l.bruto == 3.89),
+        isTrue,
+        reason: 'letra de IVA cirílica',
+      );
+      expect(
+        t.lineas.any((l) => l.nombre.startsWith('CEPILLO')),
+        isTrue,
+        reason: 'cola «C.»',
+      );
+    },
+  );
+
+  test(
+    'Supercor / El Corte Inglés: tabla con precio unitario, impuesto, cantidad y total',
+    () {
+      final t = parsearTicket(
+        File('test/fixtures/tickets/supercor_tabla.txt').readAsLinesSync(),
+      );
+      expect(t.cadena, 'supercor');
+      expect(t.fecha, DateTime(2026, 10, 18));
+      expect(t.total, 7.75);
+      expect(t.lineas, hasLength(3));
+      final bollo = t.lineas.firstWhere((l) => l.nombre.startsWith('BOLLO'));
+      expect(bollo.cantidad, 2);
+      expect(bollo.unitario, 1.00);
+      expect(bollo.bruto, 2.00);
+      expect(t.cuadra, isTrue);
+    },
+  );
 }
 
 void ticketsSinTotalTests() {

@@ -2,6 +2,13 @@
 
 Lo de la 1.0 está en el README. Aquí queda lo acordado para versiones posteriores, en el orden previsto.
 
+## 1.0.1 (20/10/2026)
+- Tiendas cercanas: varios servidores de Overpass con respaldo escalonado (el principal se saturó) y mensajes de error distintos
+  (mapas ocupado / sin ubicación / sin permiso). Para muchos usuarios convendrá una **caché propia** de tiendas por zona en el servidor.
+- Tickets: OCR nativo de Apple (Vision) en lugar de ML Kit (la app pesa 18 MB menos y se puede probar en simulador); el lector
+  entiende tablas de Supercor/El Corte Inglés, pesos sin «EUR/kg», totales sin etiqueta (fila «Suma» / «IMP.»), letras de IVA mal
+  leídas y nombres perdidos; las líneas se pueden **corregir, quitar o añadir a mano** antes de aplicar.
+
 ## 1.1 · Ticket después de la compra (casar con la lista)
 Al importar o escanear un ticket **después** de haber comprado:
 1. **Casar con la lista, también con lo ya marcado como comprado** (hoy y ayer): rellenar precio, cantidad y tienda reales

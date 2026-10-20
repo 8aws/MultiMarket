@@ -77,27 +77,37 @@ double? _num(String s) {
 const _precio = r'-?\d+[.,]\d{2}';
 const _eur = r'(?:€|£|eur|euros)?';
 
+// «0,953 kg x 6,56 EUR/kg»; el OCR suele cortar el «EUR/kg» final, así que es opcional
 final _pesoRe = RegExp(
   r'(\d+[.,]\d{2,3})\s*kg\s*[x×*]\s*(' +
       _precio +
       r')\s*' +
       _eur +
-      r'\s*/\s*kg',
+      r'(?:\s*/\s*kg)?\s*$',
   caseSensitive: false,
 );
+// Tabla de El Corte Inglés / Supercor: «NOMBRE  1,10 €  A  [cant]  1,10 €»
+final _filaTablaRe = RegExp(
+  r'^(.+?)\s+(\d+[.,]\d{2})\s*€\s+([A-Z])\s+(?:(\d+)\s+)?(\d+[.,]\d{2})\s*€$',
+);
+final _filaTablaSinTotalRe = RegExp(
+  r'^(.+?)\s+(\d+[.,]\d{2})\s*€\s+([A-Z])(?:\s+(\d+))?$',
+);
+// importe seguido de basura del OCR («3,12 îŘšîŚł»): el nombre se perdió
+final _precioBasuraRe = RegExp(r'^(-?\d+[.,]\d{2})\s*[^\x00-\x7F]{1,8}$');
 // «AGUA 36x 0.28 10.08 B»  (MÁS)
 final _cantUnitTotalRe = RegExp(
-  r'^(.*?)\s+(\d+)\s*[x×]\s+(\d+[.,]\d{2})\s+(' + _precio + r')\s*([A-Z0-9])?$',
+  r'^(.*?)\s+(\d+)\s*[x×]\s+(\d+[.,]\d{2})\s+(' + _precio + r')\s*(\S{1,3})?$',
   caseSensitive: false,
 );
 // «CHIPS   1,49x   4   5,96 B»  (Lidl: unitario x cantidad)
 final _unitXCantRe = RegExp(
-  r'^(.*?)\s+(\d+[.,]\d{2})\s*[x×]\s+(\d+)\s+(' + _precio + r')\s*([A-Z0-9])?$',
+  r'^(.*?)\s+(\d+[.,]\d{2})\s*[x×]\s+(\d+)\s+(' + _precio + r')\s*(\S{1,3})?$',
   caseSensitive: false,
 );
 // «PIZZA JAMÓN Y QUESO   2,39 B» / «BARRA CAMPESINA   0,62 € 2»
 final _colaPrecioRe = RegExp(
-  r'^(.*?)\s*(' + _precio + r')\s*' + _eur + r'\s*([A-Z0-9])?$',
+  r'^(.*?)\s*(' + _precio + r')\s*' + _eur + r'\s*(\S{1,3})?$',
   caseSensitive: false,
 );
 final _anclaFinRe = RegExp(
@@ -106,7 +116,7 @@ final _anclaFinRe = RegExp(
 );
 // Líneas con importe que NO son productos (saldos, puntos, club, tarjeta, cambio…).
 final _noProductoRe = RegExp(
-  r'\b(saldo|acumulado|socio|club|puntos|ventajas|cambio|efectivo|tarjeta|visa|mastercard|importe|entregado|devoluci[oó]n|ahorro|iva|cuota|base imponible)\b',
+  r'\b(saldo|acumulado|socio|club|puntos|ventajas|cambio|efectivo|tarjeta|visa|mastercard|importe|imp|entregado|devoluci[oó]n|ahorro|iva|cuota|base imponible|suma)\b',
   caseSensitive: false,
 );
 final _descuentoRe = RegExp(
@@ -128,6 +138,9 @@ String? _detectarCadena(List<String> l) {
     'consum': 'consum',
     'supermercados mas': 'mas',
     'supermercados más': 'mas',
+    'supercor': 'supercor',
+    'hipercor': 'hipercor',
+    'el corte ingl': 'elcorteingles',
   };
   for (final e in mapa.entries) {
     if (t.contains(e.key)) return e.value;
@@ -138,6 +151,13 @@ String? _detectarCadena(List<String> l) {
 
 DateTime? _detectarFecha(List<String> l) {
   for (final x in l.take(60)) {
+    final iso = RegExp(r'(\d{4})-(\d{2})-(\d{2})').firstMatch(x);
+    if (iso != null) {
+      final y = int.parse(iso.group(1)!),
+          mo = int.parse(iso.group(2)!),
+          d = int.parse(iso.group(3)!);
+      if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return DateTime(y, mo, d);
+    }
     final m = RegExp(r'(\d{2})[/.-](\d{2})[/.-](\d{2,4})').firstMatch(x);
     if (m != null) {
       final d = int.parse(m.group(1)!), mo = int.parse(m.group(2)!);
@@ -182,6 +202,13 @@ String _arreglarDigitos(String l) => l
     );
 
 /// Interpreta un ticket a partir de sus líneas de texto.
+const _nombreVacio = '(sin nombre)';
+
+TicketLinea _sinNombre(double imp, {String? iva}) =>
+    TicketLinea(nombre: _nombreVacio, bruto: imp, iva: iva)
+      ..dudosa = true
+      ..nota = 'No se leyó el nombre: escríbelo o elimina la línea';
+
 final _soloPrecioRe = RegExp(
   r'^-?\d+[.,]\d{2}\s*(?:€|eur)?$',
   caseSensitive: false,
@@ -252,7 +279,7 @@ Ticket parsearTicket(List<String> crudas) {
         totalPagar ??= v;
       } else if (RegExp(
         r'^total( compra)?$',
-      ).hasMatch(nombre.replaceAll(RegExp(r'[ .]+$'), ''))) {
+      ).hasMatch(nombre.replaceAll(RegExp(r'[ .:]+$'), ''))) {
         totalCompra ??= v;
       } else if (RegExp(
             r'^descuento( total)?$',
@@ -266,7 +293,21 @@ Ticket parsearTicket(List<String> crudas) {
       if (!_descuentoRe.hasMatch(l)) fin = i;
     }
   }
-  final total = totalPagar ?? totalCompra;
+  // totales alternativos cuando el OCR perdió la etiqueta: fila «Suma … PVP» del desglose de IVA o «IMP. 107,06»
+  double? totalSuma, totalImp;
+  for (final l in lineas) {
+    final ms = RegExp(
+      r'^suma\b.*?(-?\d+[.,]\d{2})\s*(?:€|eur)?$',
+      caseSensitive: false,
+    ).firstMatch(l);
+    if (ms != null) totalSuma ??= _num(ms.group(1)!);
+    final mi = RegExp(
+      r'^imp\.?\s*:?\s*(-?\d+[.,]\d{2})',
+      caseSensitive: false,
+    ).firstMatch(l);
+    if (mi != null) totalImp ??= _num(mi.group(1)!);
+  }
+  final total0 = totalPagar ?? totalCompra;
 
   // clasificación del cuerpo
   final toks = <_Tok>[];
@@ -278,6 +319,54 @@ Ticket parsearTicket(List<String> crudas) {
         _Tok(_Tipo.peso, kg: _num(w.group(1)!), unit: _num(w.group(2)!)),
       );
       continue;
+    }
+    final tb = _filaTablaRe.firstMatch(l);
+    if (tb != null && !_noProductoRe.hasMatch(tb.group(1)!)) {
+      final unit = _num(tb.group(2)!)!, tot = _num(tb.group(5)!)!;
+      final cant = tb.group(4) != null
+          ? double.parse(tb.group(4)!)
+          : (unit > 0
+                ? (tot / unit).roundToDouble().clamp(1.0, 999.0).toDouble()
+                : 1.0);
+      toks.add(
+        _Tok(
+          _Tipo.producto,
+          linea: TicketLinea(
+            nombre: _limpiarNombre(tb.group(1)!),
+            bruto: tot,
+            cantidad: cant,
+            unitario: unit,
+            iva: tb.group(3),
+          ),
+        ),
+      );
+      continue;
+    }
+    final ts = _filaTablaSinTotalRe.firstMatch(l);
+    if (ts != null && !_noProductoRe.hasMatch(ts.group(1)!)) {
+      final unit = _num(ts.group(2)!)!;
+      final cant = ts.group(4) != null ? double.parse(ts.group(4)!) : 1.0;
+      toks.add(
+        _Tok(
+          _Tipo.producto,
+          linea: TicketLinea(
+            nombre: _limpiarNombre(ts.group(1)!),
+            bruto: unit * cant,
+            cantidad: cant,
+            unitario: unit,
+            iva: ts.group(3),
+          ),
+        ),
+      );
+      continue;
+    }
+    final bs = _precioBasuraRe.firstMatch(l);
+    if (bs != null) {
+      final imp = _num(bs.group(1)!)!;
+      if (imp > 0) {
+        toks.add(_Tok(_Tipo.producto, linea: _sinNombre(imp)));
+        continue;
+      }
     }
     var m = _cantUnitTotalRe.firstMatch(l);
     if (m != null) {
@@ -326,6 +415,10 @@ Ticket parsearTicket(List<String> crudas) {
       final nombre = m.group(1)!.trim();
       if (imp < 0 || _descuentoRe.hasMatch(nombre)) {
         toks.add(_Tok(_Tipo.descuento, importe: imp < 0 ? imp : -imp));
+      } else if (RegExp(r'^[\d\s.,€£/-]*$').hasMatch(nombre) &&
+          !_descuentoRe.hasMatch(nombre)) {
+        // importe sin nombre legible (el OCR perdió el texto): se conserva como línea dudosa para poder cuadrar
+        toks.add(_Tok(_Tipo.producto, linea: _sinNombre(imp, iva: m.group(3))));
       } else if (nombre.length >= 2 &&
           !_noProductoRe.hasMatch(nombre) &&
           !RegExp(r'^[\d\s.,€£/-]+$').hasMatch(nombre)) {
@@ -340,6 +433,30 @@ Ticket parsearTicket(List<String> crudas) {
             ),
           ),
         );
+      }
+    }
+  }
+
+  // Total SIN etiqueta: un importe suelto (sin nombre) que iguala lo acumulado es el total; ahí acaba el cuerpo
+  double? totalInferido;
+  {
+    var acum = 0.0;
+    for (var i = 0; i < toks.length; i++) {
+      final t0 = toks[i];
+      if (t0.tipo == _Tipo.producto) {
+        final l0 = t0.linea!;
+        final conocidos = [?total0, ?totalSuma, ?totalImp];
+        if (l0.nombre == _nombreVacio &&
+            acum >= 1 &&
+            ((l0.bruto - acum).abs() <= 0.06 ||
+                conocidos.any((k) => (k - l0.bruto).abs() <= 0.005))) {
+          totalInferido = l0.bruto;
+          toks.removeRange(i, toks.length);
+          break;
+        }
+        acum += l0.bruto;
+      } else if (t0.tipo == _Tipo.descuento) {
+        acum += t0.importe!;
       }
     }
   }
@@ -403,11 +520,13 @@ Ticket parsearTicket(List<String> crudas) {
     }
   }
 
+  final total = total0 ?? totalInferido ?? totalSuma ?? totalImp;
   final t = Ticket(
     lineas: out,
     cadena: cadena,
     fecha: fecha,
-    total: total != null && totalPagar == null && globalDesc != 0
+    total:
+        total != null && totalPagar == null && total0 != null && globalDesc != 0
         ? total + globalDesc
         : total,
     descuentoGlobal: globalDesc,

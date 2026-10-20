@@ -1,0 +1,14 @@
+TICKET
+SUPERCOR EXP. CIUDAD
+Ctra. Ejemplo, km 1.
+Fecha / Hora: 2026-10-18 15:48:09
+Número de Operación: 0003-0000
+Productos Precio Tipo Cantidad TOTAL
+unitario Impuesto
+BARRA PAN 1,10 € A 1,10 €
+BOLLO CHOCOLATE 1,00 € B 2 2,00 €
+PASTEL CHOCO 4,65 € B 4,65 €
+SUBTOTAL: 7,75 €
+Precios con IVA INCLUIDO
+Desglose por tipo de impuesto: SUPERREDUC 4,00% Base 1,06 € Cuota 4,00 € Total 1,10 €
+TOTAL COMPRA: 7,75 €

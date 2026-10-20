@@ -1,12 +1,12 @@
 // Lee un ticket (foto, imagen o PDF) y devuelve sus líneas de texto.
 // Todo ocurre en el dispositivo y los ficheros temporales se borran siempre, hayan salido bien o mal.
 // - PDF con texto (apps de Lidl, MÁS…): se lee el texto directamente, sin OCR.
-// - Imagen o PDF escaneado: OCR de ML Kit (solo iOS/Android).
+// - Imagen o PDF escaneado: OCR nativo de Apple (Vision), solo iOS.
 
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdfrx/pdfrx.dart';
@@ -16,36 +16,32 @@ import 'ticket_ocr.dart';
 /// ¿Se puede leer un fichero en esta plataforma? (en web solo se puede pegar el texto)
 bool get lectorDisponible => !kIsWeb;
 
-bool get _hayOcr => !kIsWeb && (Platform.isIOS || Platform.isAndroid);
+bool get _hayOcr => !kIsWeb && Platform.isIOS;
 
-/// Devuelve un ticket por cada uno que haya en el fichero (una hoja escaneada puede traer varios).
+const _canalOcr = MethodChannel('es.uverse.multimarket/ocr');
+
 Future<List<List<String>>> leerTickets(String ruta) async {
   final esPdf = ruta.toLowerCase().endsWith('.pdf');
   return esPdf ? _leerPdf(ruta) : _ocr(ruta);
 }
 
+/// OCR con Apple Vision (nativo, en el dispositivo). Devuelve un ticket por cada columna de la imagen.
 Future<List<List<String>>> _ocr(String ruta) async {
   if (!_hayOcr) {
-    throw UnsupportedError('El OCR solo está disponible en iOS y Android');
+    throw UnsupportedError('El OCR de imágenes solo está disponible en iOS');
   }
-  final rec = TextRecognizer(script: TextRecognitionScript.latin);
-  try {
-    final r = await rec.processImage(InputImage.fromFilePath(ruta));
-    final fr = [
-      for (final b in r.blocks)
-        for (final l in b.lines)
-          FragmentoOcr(
-            l.text,
-            l.boundingBox.left,
-            l.boundingBox.top,
-            l.boundingBox.right,
-            l.boundingBox.bottom,
-          ),
-    ];
-    return [for (final c in separarColumnas(fr)) agruparPorFilas(c)];
-  } finally {
-    await rec.close();
-  }
+  final r = await _canalOcr.invokeListMethod<Map>('reconocer', ruta) ?? [];
+  final fr = [
+    for (final m in r)
+      FragmentoOcr(
+        m['t'] as String,
+        (m['x0'] as num).toDouble(),
+        (m['y0'] as num).toDouble(),
+        (m['x1'] as num).toDouble(),
+        (m['y1'] as num).toDouble(),
+      ),
+  ];
+  return [for (final c in separarColumnas(fr)) agruparPorFilas(c)];
 }
 
 Future<List<List<String>>> _leerPdf(String ruta) async {

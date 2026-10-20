@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../main.dart';
 import '../models.dart';
 import '../sources.dart';
+import '../state.dart';
 import '../ticket/ticket_lector.dart';
 import '../ticket/ticket_match.dart';
 import '../ticket/ticket_parser.dart';
@@ -22,9 +23,101 @@ void abrirImportarTicket(BuildContext context) => Navigator.of(
 class _Leido {
   _Leido(this.ticket, this.cruces);
   final Ticket ticket;
-  final List<Cruce> cruces;
+  List<Cruce> cruces;
   final Map<int, String> elegidos =
       {}; // línea → id de item (dudosos resueltos)
+
+  /// Tras corregir líneas a mano: se vuelve a cruzar con la lista (los índices pueden haber cambiado).
+  void recalcular(AppState s) {
+    cruces = s.cruzar(ticket);
+    elegidos.clear();
+    for (var i = 0; i < cruces.length; i++) {
+      if (cruces[i].estado == EstadoCruce.dudoso &&
+          cruces[i].alternativas.isEmpty) {
+        elegidos[i] = cruces[i].itemId!;
+      }
+    }
+  }
+}
+
+/// Edita (o quita) una línea del ticket: el OCR a veces pierde el nombre o cambia una cifra.
+Future<void> _editarLineaTicket(
+  BuildContext context,
+  AppState s,
+  _Leido r,
+  TicketLinea? l,
+  VoidCallback refrescar,
+) async {
+  final nombre = TextEditingController(
+    text: l == null || l.nombre == '(sin nombre)' ? '' : l.nombre,
+  );
+  final importe = TextEditingController(
+    text: l == null ? '' : l.bruto.toStringAsFixed(2).replaceAll('.', ','),
+  );
+  final res = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(l == null ? 'Añadir línea' : 'Corregir línea'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: nombre,
+            decoration: const InputDecoration(
+              labelText: 'Producto',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: importe,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Importe de la línea',
+              suffixText: '€',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        if (l != null)
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'quitar'),
+            child: const Text('Quitar'),
+          ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, 'ok'),
+          child: const Text('Guardar'),
+        ),
+      ],
+    ),
+  );
+  if (res == null) return;
+  if (res == 'quitar' && l != null) {
+    r.ticket.lineas.remove(l);
+  } else if (res == 'ok') {
+    final v = double.tryParse(importe.text.trim().replaceAll(',', '.'));
+    final n = nombre.text.trim();
+    if (v == null || v <= 0 || n.isEmpty) return;
+    if (l == null) {
+      r.ticket.lineas.add(TicketLinea(nombre: n, bruto: v));
+    } else {
+      l
+        ..nombre = n
+        ..bruto = v
+        ..dudosa = false
+        ..nota = null;
+    }
+  } else {
+    return;
+  }
+  r.recalcular(s);
+  refrescar();
 }
 
 class TicketPage extends StatefulWidget {
@@ -271,6 +364,15 @@ class _TicketCard extends StatelessWidget {
             const Divider(),
             for (var i = 0; i < r.cruces.length; i++)
               _Linea(r, i, pend, refrescar),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Añadir una línea que falta'),
+                onPressed: () =>
+                    _editarLineaTicket(context, s, r, null, refrescar),
+              ),
+            ),
           ],
         ),
       ),
@@ -296,68 +398,69 @@ class _Linea extends StatelessWidget {
         : (l.cantidad != null && l.cantidad! > 1
               ? '${l.cantidad!.round()} ud'
               : null);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              if (l.dudosa)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Icon(Icons.warning_amber, size: 18, color: cs.error),
+    final s = AppScope.of(context);
+    return InkWell(
+      onTap: () => _editarLineaTicket(context, s, r, l, refrescar),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (l.dudosa)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Icon(Icons.warning_amber, size: 18, color: cs.error),
+                  ),
+                Expanded(
+                  child: Text(
+                    '${l.nombre}${detalle == null ? '' : ' · $detalle'}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              Expanded(
-                child: Text(
-                  '${l.nombre}${detalle == null ? '' : ' · $detalle'}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                const SizedBox(width: 8),
+                Text(
+                  eur(l.neto),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                eur(l.neto),
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          if (l.nota != null)
-            Text(l.nota!, style: TextStyle(fontSize: 12, color: cs.error)),
-          if (c.estado == EstadoCruce.seguro)
-            Text(
-              '✓ ${nombreItem(c.itemId) ?? 'de la lista'}',
-              style: const TextStyle(fontSize: 12, color: Colors.green),
-            )
-          else if (c.estado == EstadoCruce.dudoso)
-            DropdownButton<String?>(
-              isExpanded: true,
-              isDense: true,
-              value: r.elegidos[i],
-              hint: const Text('¿Es alguno de tu lista?'),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('Ninguno')),
-                for (final it in pend)
-                  if (it.id == c.itemId ||
-                      c.alternativas.contains(it.id) ||
-                      true)
-                    DropdownMenuItem(value: it.id, child: Text(it.name)),
               ],
-              onChanged: (v) {
-                if (v == null) {
-                  r.elegidos.remove(i);
-                } else {
-                  r.elegidos[i] = v;
-                }
-                refrescar();
-              },
-            )
-          else
-            Text(
-              'Nuevo: solo al historial',
-              style: TextStyle(fontSize: 12, color: cs.outline),
             ),
-        ],
+            if (l.nota != null)
+              Text(l.nota!, style: TextStyle(fontSize: 12, color: cs.error)),
+            if (c.estado == EstadoCruce.seguro)
+              Text(
+                '✓ ${nombreItem(c.itemId) ?? 'de la lista'}',
+                style: const TextStyle(fontSize: 12, color: Colors.green),
+              )
+            else if (c.estado == EstadoCruce.dudoso)
+              DropdownButton<String?>(
+                isExpanded: true,
+                isDense: true,
+                value: r.elegidos[i],
+                hint: const Text('¿Es alguno de tu lista?'),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Ninguno')),
+                  for (final it in pend)
+                    DropdownMenuItem(value: it.id, child: Text(it.name)),
+                ],
+                onChanged: (v) {
+                  if (v == null) {
+                    r.elegidos.remove(i);
+                  } else {
+                    r.elegidos[i] = v;
+                  }
+                  refrescar();
+                },
+              )
+            else
+              Text(
+                'Nuevo: solo al historial',
+                style: TextStyle(fontSize: 12, color: cs.outline),
+              ),
+          ],
+        ),
       ),
     );
   }

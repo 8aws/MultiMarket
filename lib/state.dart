@@ -948,9 +948,20 @@ class AppState extends ChangeNotifier {
       } else {
         storesError = 'No hay supermercados en OpenStreetMap en ese radio.';
       }
-    } catch (e) {
+    } on OverpassOcupado {
+      storesError = stores.isEmpty
+          ? 'El servicio de mapas (OpenStreetMap) está ocupado. Inténtalo en unos minutos.'
+          : 'El servicio de mapas (OpenStreetMap) está ocupado: se mantienen las tiendas guardadas.';
+    } on TimeoutException {
       storesError =
-          'No se pudo actualizar (¿sin conexión o sin permiso de ubicación?).';
+          'No se pudo obtener tu ubicación. Comprueba que el GPS está activo y que MultiMarket tiene permiso.';
+    } on PermissionDeniedException {
+      storesError =
+          'MultiMarket no tiene permiso de ubicación: actívalo en Ajustes del iPhone.';
+    } on LocationServiceDisabledException {
+      storesError = 'La ubicación del iPhone está desactivada.';
+    } catch (e) {
+      storesError = 'No se pudo actualizar (comprueba la conexión): $e';
     }
     loadingStores = false;
     changed();

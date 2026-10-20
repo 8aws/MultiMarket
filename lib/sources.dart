@@ -1,3 +1,4 @@
+import 'dart:async';
 // Fuentes de datos ABIERTAS y sin scraping:
 //  - OpenStreetMap (Overpass): tiendas cercanas. Datos © colaboradores de OpenStreetMap, ODbL.
 //  - Open Food Facts: catálogo de productos y códigos de barras. ODbL / DbCL.
@@ -308,6 +309,67 @@ Future<Map<String, Quote>> equivalentOpenPrices(Product p) async {
 }
 
 // -------------------------------------------------------------- Overpass
+/// Servidores públicos de Overpass, por orden de preferencia. El principal (`overpass-api.de`) se satura con frecuencia
+/// (502, 23–40 s de respuesta), así que se lanzan varios con retraso escalonado y gana el primero que responde bien.
+const overpassServidores = [
+  'overpass.openstreetmap.fr',
+  'overpass-api.de',
+  'z.overpass-api.de',
+  'overpass.kumi.systems',
+  'overpass.private.coffee',
+];
+
+class OverpassOcupado implements Exception {
+  OverpassOcupado(this.detalle);
+  final String detalle;
+  @override
+  String toString() => 'Servicio de mapas ocupado ($detalle)';
+}
+
+/// Lanza la consulta en varios servidores escalonados (cada 4 s) y devuelve el primer JSON correcto.
+Future<Map<String, dynamic>> consultarOverpass(
+  String q, {
+  http.Client? cliente,
+  List<String> servidores = overpassServidores,
+  Duration escalon = const Duration(seconds: 4),
+  Duration limite = const Duration(seconds: 20),
+}) {
+  final c = cliente ?? http.Client();
+  final fin = Completer<Map<String, dynamic>>();
+  var pendientes = servidores.length;
+  final errores = <String>[];
+  for (var i = 0; i < servidores.length; i++) {
+    final host = servidores[i];
+    Future<void>(() async {
+      await Future<void>.delayed(escalon * i);
+      if (fin.isCompleted) return;
+      try {
+        final r = await c
+            .post(
+              Uri.https(host, '/api/interpreter'),
+              headers: _ua,
+              body: {'data': q},
+            )
+            .timeout(limite);
+        if (r.statusCode != 200) throw Exception('HTTP ${r.statusCode}');
+        final j = jsonDecode(r.body) as Map<String, dynamic>;
+        final remark = '${j['remark'] ?? ''}';
+        if (remark.contains('runtime error') || remark.contains('timed out')) {
+          throw Exception('consulta rechazada: $remark');
+        }
+        if (!fin.isCompleted) fin.complete(j);
+      } catch (e) {
+        errores.add('$host: $e');
+      } finally {
+        if (--pendientes == 0 && !fin.isCompleted) {
+          fin.completeError(OverpassOcupado(errores.take(3).join('; ')));
+        }
+      }
+    });
+  }
+  return fin.future;
+}
+
 Future<List<Store>> nearbyStores(
   double lat,
   double lon,
@@ -316,16 +378,9 @@ Future<List<Store>> nearbyStores(
   final m = (radiusKm * 1000).round();
   final q =
       '[out:json][timeout:25];nwr["shop"="supermarket"](around:$m,$lat,$lon);out center tags 300;';
-  final r = await http
-      .post(
-        Uri.https('overpass-api.de', '/api/interpreter'),
-        headers: _ua,
-        body: {'data': q},
-      )
-      .timeout(const Duration(seconds: 25));
-  if (r.statusCode != 200) throw Exception('Overpass ${r.statusCode}');
+  final r = await consultarOverpass(q);
   final out = <Store>[];
-  for (final e in (jsonDecode(r.body)['elements'] as List)) {
+  for (final e in (r['elements'] as List)) {
     final tags = (e['tags'] as Map?)?.cast<String, dynamic>() ?? {};
     final c = e['center'] as Map?;
     final la = (e['lat'] ?? c?['lat']) as num?,
