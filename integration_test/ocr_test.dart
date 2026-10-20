@@ -23,13 +23,20 @@ Future<String> dibujar(List<String> lineas) async {
     final tp = TextPainter(
       text: TextSpan(
         text: lineas[i],
-        style: const TextStyle(color: ui.Color(0xFF000000), fontSize: 34, fontFamily: 'Courier'),
+        style: const TextStyle(
+          color: ui.Color(0xFF000000),
+          fontSize: 34,
+          fontFamily: 'Courier',
+        ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
     tp.paint(c, ui.Offset(30, alto * (i + 0.5)));
   }
-  final img = await rec.endRecording().toImage(ancho.toInt(), (alto * (lineas.length + 1)).toInt());
+  final img = await rec.endRecording().toImage(
+    ancho.toInt(),
+    (alto * (lineas.length + 1)).toInt(),
+  );
   final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
   final dir = await getTemporaryDirectory();
   final f = File('${dir.path}/ocr_prueba.png');
@@ -40,26 +47,63 @@ Future<String> dibujar(List<String> lineas) async {
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('Apple Vision lee un ticket dibujado y el parser cuadra el total', (tester) async {
-    final ruta = await tester.runAsync(
-      () => dibujar([
-        'LIDL SUPERMERCADOS S.A.U.',
-        'LECHE ENTERA 1L        1,05 A',
-        'PAN DE MOLDE           1,35 B',
-        'QUESO FRESCO           2,05 A',
-        'TOTAL                  4,45',
-        'ENTREGA                4,45',
-      ]),
-    );
+  testWidgets(
+    'Apple Vision lee un ticket dibujado y el parser cuadra el total',
+    (tester) async {
+      final ruta = await tester.runAsync(
+        () => dibujar([
+          'LIDL SUPERMERCADOS S.A.U.',
+          'LECHE ENTERA 1L        1,05 A',
+          'PAN DE MOLDE           1,35 B',
+          'QUESO FRESCO           2,05 A',
+          'TOTAL                  4,45',
+          'ENTREGA                4,45',
+        ]),
+      );
+      final tickets = await tester.runAsync(() => leerTickets(ruta!));
+      expect(tickets, isNotNull);
+      expect(tickets!, isNotEmpty);
+      final t = parsearTicket(tickets.first);
+      // ignore: avoid_print
+      print('LINEAS: ${tickets.first}');
+      expect(t.cadena, 'lidl');
+      expect(t.lineas.length, 3);
+      expect(t.total, 4.45);
+      expect(t.cuadra, isTrue);
+    },
+  );
+
+  testWidgets('imagen muy alta: lectura por tiras sin perder ni duplicar líneas', (
+    tester,
+  ) async {
+    final lineas = <String>['LIDL SUPERMERCADOS S.A.U.'];
+    var total = 0.0;
+    for (var i = 1; i <= 40; i++) {
+      final p = 0.50 + i * 0.37;
+      total += p;
+      lineas.add(
+        'PRODUCTO NUMERO ${i.toString().padLeft(2, '0')}'.padRight(28) +
+            '${p.toStringAsFixed(2).replaceAll('.', ',')} A',
+      );
+    }
+    final tot = total.toStringAsFixed(2).replaceAll('.', ',');
+    lineas.addAll(['TOTAL'.padRight(28) + tot, 'ENTREGA'.padRight(28) + tot]);
+    final ruta = await tester.runAsync(() => dibujar(lineas));
     final tickets = await tester.runAsync(() => leerTickets(ruta!));
-    expect(tickets, isNotNull);
-    expect(tickets!, isNotEmpty);
+    // ignore: avoid_print
+    print(
+      'COLUMNAS=${tickets!.length} n=${tickets.first.length} primeras=${tickets.first.take(5)} ultimas=${tickets.first.reversed.take(3).toList()}',
+    );
     final t = parsearTicket(tickets.first);
     // ignore: avoid_print
-    print('LINEAS: ${tickets.first}');
-    expect(t.cadena, 'lidl');
-    expect(t.lineas.length, 3);
-    expect(t.total, 4.45);
+    print(
+      'TIRAS: lineas=${t.lineas.length} total=${t.total} neta=${t.sumaNeta.toStringAsFixed(2)} cuadra=${t.cuadra}',
+    );
+    expect(
+      t.lineas.length,
+      40,
+      reason: 'ninguna línea perdida ni repetida en las uniones de las tiras',
+    );
     expect(t.cuadra, isTrue);
   });
 }

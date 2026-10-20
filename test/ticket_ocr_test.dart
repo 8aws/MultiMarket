@@ -18,17 +18,30 @@ void main() {
   test('dos tickets lado a lado se separan y no se mezclan filas', () {
     final fr = [
       for (var i = 0; i < 6; i++) ...[
-        f('A$i', 10, 20.0 * i, 80),
+        f('ARTICULO A$i', 10, 20.0 * i, 80),
         f('${i}0,00', 90, 20.0 * i, 120),
-        f('B$i', 220, 20.0 * i + 3, 290),
+        f('ARTICULO B$i', 220, 20.0 * i + 3, 290),
         f('${i}1,00', 300, 20.0 * i + 3, 330),
       ],
     ];
     final cols = separarColumnas(fr);
     expect(cols, hasLength(2));
-    expect(agruparPorFilas(cols[0]).first, 'A0 00,00');
-    expect(agruparPorFilas(cols[1]).first, 'B0 01,00');
+    expect(agruparPorFilas(cols[0]).first, 'ARTICULO A0 00,00');
+    expect(agruparPorFilas(cols[1]).first, 'ARTICULO B0 01,00');
   });
+
+  test(
+    'nombres a un lado y precios al otro del MISMO ticket no se parten en dos',
+    () {
+      final fr = [
+        for (var i = 0; i < 12; i++) ...[
+          f('PRODUCTO NUMERO $i', 10, 20.0 * i, 130),
+          f('${i + 1},50 A', 330, 20.0 * i, 380),
+        ],
+      ];
+      expect(separarColumnas(fr), hasLength(1));
+    },
+  );
 
   test('un solo ticket no se parte', () {
     final fr = [

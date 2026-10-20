@@ -65,6 +65,27 @@ List<List<FragmentoOcr>> separarColumnas(List<FragmentoOcr> fr) {
   final minimo = fr.length * .25;
   final validos = grupos.where((g) => g.length >= minimo).toList();
   if (validos.length < 2) return [fr];
+  // Un ticket de verdad tiene texto Y precios; una «columna de nombres» y una «columna de precios» del mismo ticket
+  // no son dos tickets. Además ambos deben ocupar casi toda la altura.
+  bool pareceTicket(List<FragmentoOcr> g) {
+    final precios = g
+        .where((f) => RegExp(r'\d+[.,]\d{2}').hasMatch(f.texto))
+        .length;
+    final textos = g
+        .where((f) => RegExp(r'[A-Za-zÁÉÍÓÚÑáéíóúñ]{3,}').hasMatch(f.texto))
+        .length;
+    return precios >= 3 && textos >= 3;
+  }
+
+  final alturaTotal =
+      fr.map((f) => f.abajo).reduce((a, b) => a > b ? a : b) -
+      fr.map((f) => f.arriba).reduce((a, b) => a < b ? a : b);
+  double altura(List<FragmentoOcr> g) =>
+      g.map((f) => f.abajo).reduce((a, b) => a > b ? a : b) -
+      g.map((f) => f.arriba).reduce((a, b) => a < b ? a : b);
+  if (!validos.every((g) => pareceTicket(g) && altura(g) >= alturaTotal * .6)) {
+    return [fr];
+  }
   // los fragmentos sueltos de grupos pequeños se reparten al grupo válido más cercano
   for (final g in grupos.where((g) => g.length < minimo)) {
     for (final f in g) {

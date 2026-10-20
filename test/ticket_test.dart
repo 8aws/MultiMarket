@@ -7,6 +7,7 @@ List<String> leer(String nombre) =>
     File('test/fixtures/tickets/$nombre.txt').readAsLinesSync();
 
 void main() {
+  capturaSupercorTests();
   ticketsRuidososTests();
   ticketsSinTotalTests();
   group('tickets sintéticos con la estructura de cada cadena', () {
@@ -246,6 +247,34 @@ void ticketsRuidososTests() {
       expect(bollo.cantidad, 2);
       expect(bollo.unitario, 1.00);
       expect(bollo.bruto, 2.00);
+      expect(t.cuadra, isTrue);
+    },
+  );
+}
+
+void capturaSupercorTests() {
+  test(
+    'Supercor: captura de pantalla de un correo (cabecera de correo, columnas perdidas, total sin cifra)',
+    () {
+      final t = parsearTicket(
+        File('test/fixtures/tickets/supercor_captura.txt').readAsLinesSync(),
+      );
+      expect(t.cadena, 'supercor');
+      expect(t.lineas.map((l) => l.nombre), [
+        'BARRA PAN',
+        'BOLLO CHOCOLATE',
+        'PASTEL CHOCO',
+      ]);
+      expect(
+        t.lineas[1].cantidad,
+        2,
+        reason: '2 × 1,00 = 2,00 aunque falte la letra del impuesto',
+      );
+      expect(
+        t.total,
+        7.75,
+        reason: 'sale del SUBTOTAL si «TOTAL COMPRA» pierde la cifra',
+      );
       expect(t.cuadra, isTrue);
     },
   );

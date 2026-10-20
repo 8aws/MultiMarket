@@ -88,7 +88,7 @@ final _pesoRe = RegExp(
 );
 // Tabla de El Corte Inglés / Supercor: «NOMBRE  1,10 €  A  [cant]  1,10 €»
 final _filaTablaRe = RegExp(
-  r'^(.+?)\s+(\d+[.,]\d{2})\s*€\s+([A-Z])\s+(?:(\d+)\s+)?(\d+[.,]\d{2})\s*€$',
+  r'^(.+?)\s+(\d+[.,]\d{2})\s*€\s+(?:([A-Z])\s+)?(?:(\d+)\s+)?(\d+[.,]\d{2})\s*€$',
 );
 final _filaTablaSinTotalRe = RegExp(
   r'^(.+?)\s+(\d+[.,]\d{2})\s*€\s+([A-Z])(?:\s+(\d+))?$',
@@ -261,7 +261,7 @@ Ticket parsearTicket(List<String> crudas) {
   final fecha = _detectarFecha(lineas);
 
   // totales: «TOTAL A PAGAR» / «A PAGAR» mandan; «TOTAL COMPRA» es el bruto; «DESCUENTO» global
-  double? totalPagar, totalCompra, descGlobal;
+  double? totalPagar, totalCompra, totalSub, descGlobal;
   var fin = lineas.length;
   for (var i = 0; i < lineas.length; i++) {
     final l = lineas[i];
@@ -277,6 +277,10 @@ Ticket parsearTicket(List<String> crudas) {
         r'^(\d+\s*art\.?\s*)?(total a pagar|a pagar|total pagado|importe total)',
       ).hasMatch(nombre)) {
         totalPagar ??= v;
+      } else if (RegExp(
+        r'^subtotal$',
+      ).hasMatch(nombre.replaceAll(RegExp(r'[ .:]+$'), ''))) {
+        totalSub ??= v;
       } else if (RegExp(
         r'^total( compra)?$',
       ).hasMatch(nombre.replaceAll(RegExp(r'[ .:]+$'), ''))) {
@@ -307,7 +311,7 @@ Ticket parsearTicket(List<String> crudas) {
     ).firstMatch(l);
     if (mi != null) totalImp ??= _num(mi.group(1)!);
   }
-  final total0 = totalPagar ?? totalCompra;
+  final total0 = totalPagar ?? totalCompra ?? totalSub;
 
   // clasificación del cuerpo
   final toks = <_Tok>[];
@@ -332,7 +336,10 @@ Ticket parsearTicket(List<String> crudas) {
         _Tok(
           _Tipo.producto,
           linea: TicketLinea(
-            nombre: _limpiarNombre(tb.group(1)!),
+            // la letra del impuesto a veces se cuela al final del nombre («… CHOC B»)
+            nombre: _limpiarNombre(
+              tb.group(1)!.replaceFirst(RegExp(r'\s+[A-Z]$'), ''),
+            ),
             bruto: tot,
             cantidad: cant,
             unitario: unit,

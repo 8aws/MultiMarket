@@ -1,0 +1,23 @@
+17:35 1
+TRA PAN, SuperfA
+E DE COMPRA
+Estimado Cliente:
+Gracias por comprar en Supercor, S.A.
+TICKET
+SUPERCOR EXP. CIUDAD
+Ctra. Ejemplo, km 1.
+Fecha / Hora: 2026-10-18 15:48:09
+Vendedor: 12001/95 - NOMBRE
+Precio Tipo
+rroauctos Cantidad TOTAL
+unitario impuesto
+BARRA PAN 1,10 € 1,10 €
+BOLLO CHOCOLATE B 1,00 € 2 2,00 €
+PASTEL CHOCO 4,65 € 1 4,65 €
+SUBTOTAL: 7,75 €
+Precios con IVA INCLUIDO
+Desglose por tipo de impuesto: SUPERREDUC 4,00% Base 1,06 € Cuota 4,00 € Total 1,10 €
+TOTAL COMPRA:
+Forma de Pago:
+Tarj. ECITECI ************453***, cargo en cuenta 7,75 €
+App ECI
