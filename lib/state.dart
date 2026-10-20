@@ -914,6 +914,14 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Origen de las tiendas cercanas (sustituible en las pruebas).
+  late Future<List<Store>> Function(double lat, double lon, double radioKm)
+  buscarTiendas = (lat, lon, r) =>
+      nearbyStores(lat, lon, r, servidorPropio: cfg.serverUrl);
+
+  /// La lista de supermercados ya se creó con una ubicación real: no cambia sola, solo si el usuario la actualiza.
+  bool get listaDeTiendasFijada => !locApprox && stores.isNotEmpty;
+
   Future<void> refreshStores({bool relocate = true}) async {
     loadingStores = true;
     storesError = null;
@@ -936,9 +944,21 @@ class AppState extends ChangeNotifier {
           locApprox = false;
         }
       }
-      final found = await nearbyStores(lat, lon, cfg.radiusKm.clamp(1, 10));
+      final found = await buscarTiendas(lat, lon, cfg.radiusKm.clamp(1, 10));
       fetchedRadiusKm = cfg.radiusKm;
       if (found.isNotEmpty) {
+        // las tiendas que ya usas (asignadas a un producto o activas) se conservan aunque ya no salgan en la búsqueda
+        final usadas = <String>{
+          ...cfg.enabled,
+          for (final i in allItems)
+            if (i.storeId != null) i.storeId!,
+        };
+        for (final viejo in stores) {
+          if (usadas.contains(viejo.id) &&
+              !found.any((n) => n.id == viejo.id)) {
+            extraStores[viejo.id] = viejo;
+          }
+        }
         stores = found;
         // conserva las activas que sigan existiendo; si no hay ninguna, activa las 3 más cercanas
         cfg.enabled.removeWhere((id) => !stores.any((s) => s.id == id));

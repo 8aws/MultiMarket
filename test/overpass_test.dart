@@ -18,6 +18,7 @@ const _ok = {
 };
 
 void main() {
+  cacheTests();
   test('si el servidor principal falla, responde el siguiente', () async {
     final llamadas = <String>[];
     final c = MockClient((r) async {
@@ -93,5 +94,47 @@ void main() {
       ),
       throwsA(isA<OverpassOcupado>()),
     );
+  });
+}
+
+void cacheTests() {
+  test('la caché propia entrega las tiendas sin tocar Overpass', () async {
+    final c = MockClient((r) async {
+      expect(r.url.path, '/api/mm/v1/tiendas');
+      return http.Response(
+        jsonEncode({
+          'incompleto': false,
+          'items': [
+            {
+              't': 'node',
+              'id': 7,
+              'lat': 36.5,
+              'lon': -4.6,
+              'name': 'Lidl',
+              'brand': 'Lidl',
+            },
+            {
+              't': 'way',
+              'id': 9,
+              'lat': 36.51,
+              'lon': -4.61,
+              'name': 'Dia',
+              'brand': 'Dia',
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    final r = await tiendasDeNuestraCache(
+      'https://x.test',
+      36.5,
+      -4.6,
+      5,
+      cliente: c,
+    );
+    expect(r.incompleto, isFalse);
+    expect(r.tiendas.map((t) => t.id), ['osm:node/7', 'osm:way/9']);
+    expect(r.tiendas.first.km, lessThan(r.tiendas.last.km));
   });
 }

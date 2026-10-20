@@ -370,40 +370,125 @@ Future<Map<String, dynamic>> consultarOverpass(
   return fin.future;
 }
 
+/// Convierte un elemento de OpenStreetMap (de Overpass o de nuestra caché) en una tienda.
+Store? _tiendaOsm(
+  String tipo,
+  Object id,
+  Map<String, dynamic> tags,
+  num? la,
+  num? lo,
+  double lat,
+  double lon,
+) {
+  if (la == null || lo == null) return null;
+  final name = (tags['name'] ?? tags['brand'] ?? 'Supermercado') as String;
+  final chain =
+      chainOf(tags['brand'] as String?) ?? chainOf(name) ?? name.toLowerCase();
+  return Store(
+    id: 'osm:$tipo/$id',
+    name: name,
+    chain: chain,
+    lat: la.toDouble(),
+    lon: lo.toDouble(),
+    km: haversineKm(lat, lon, la.toDouble(), lo.toDouble()),
+  );
+}
+
+/// Supermercados de nuestro servidor (caché de OpenStreetMap por zonas). `incompleto` = faltan zonas por descargar.
+Future<({List<Store> tiendas, bool incompleto})> tiendasDeNuestraCache(
+  String servidor,
+  double lat,
+  double lon,
+  double radiusKm, {
+  http.Client? cliente,
+}) async {
+  final c = cliente ?? http.Client();
+  // privacidad: al servidor solo llega la zona (posición redondeada a ~1 km) y se amplía el radio para compensar
+  final uri = Uri.parse('$servidor/api/mm/v1/tiendas').replace(
+    queryParameters: {
+      'lat': lat.toStringAsFixed(2),
+      'lon': lon.toStringAsFixed(2),
+      'r': (radiusKm + 1.5).clamp(0.5, 15).toStringAsFixed(1),
+    },
+  );
+  final r = await c.get(uri, headers: _ua).timeout(const Duration(seconds: 30));
+  if (r.statusCode != 200) throw Exception('HTTP ${r.statusCode}');
+  final j = jsonDecode(r.body) as Map<String, dynamic>;
+  final out = <Store>[];
+  for (final e in (j['items'] as List)) {
+    final m = (e as Map).cast<String, dynamic>();
+    final t = _tiendaOsm(
+      '${m['t']}',
+      m['id'] as Object,
+      {'name': m['name'], 'brand': m['brand']},
+      m['lat'] as num?,
+      m['lon'] as num?,
+      lat,
+      lon,
+    );
+    if (t != null) out.add(t);
+  }
+  out.sort((a, b) => a.km.compareTo(b.km));
+  return (tiendas: out.take(80).toList(), incompleto: j['incompleto'] == true);
+}
+
+/// Tiendas cercanas: primero la caché de nuestro servidor (rápida y sin cargar los servidores públicos); si falla o está
+/// incompleta, Overpass con varios servidores; y si Overpass también falla, lo que haya en nuestra caché.
 Future<List<Store>> nearbyStores(
   double lat,
   double lon,
-  double radiusKm,
-) async {
-  final m = (radiusKm * 1000).round();
-  final q =
-      '[out:json][timeout:25];nwr["shop"="supermarket"](around:$m,$lat,$lon);out center tags 300;';
-  final r = await consultarOverpass(q);
-  final out = <Store>[];
-  for (final e in (r['elements'] as List)) {
-    final tags = (e['tags'] as Map?)?.cast<String, dynamic>() ?? {};
-    final c = e['center'] as Map?;
-    final la = (e['lat'] ?? c?['lat']) as num?,
-        lo = (e['lon'] ?? c?['lon']) as num?;
-    if (la == null || lo == null) continue;
-    final name = (tags['name'] ?? tags['brand'] ?? 'Supermercado') as String;
-    final chain =
-        chainOf(tags['brand'] as String?) ??
-        chainOf(name) ??
-        name.toLowerCase();
-    out.add(
-      Store(
-        id: 'osm:${e['type']}/${e['id']}',
-        name: name,
-        chain: chain,
-        lat: la.toDouble(),
-        lon: lo.toDouble(),
-        km: haversineKm(lat, lon, la.toDouble(), lo.toDouble()),
-      ),
-    );
+  double radiusKm, {
+  String? servidorPropio,
+}) async {
+  var parcial = <Store>[];
+  if (servidorPropio != null && servidorPropio.isNotEmpty) {
+    for (var intento = 0; intento < 3; intento++) {
+      try {
+        final r = await tiendasDeNuestraCache(
+          servidorPropio,
+          lat,
+          lon,
+          radiusKm,
+        );
+        parcial = r.tiendas;
+        if (!r.incompleto && r.tiendas.isNotEmpty) return r.tiendas;
+        if (!r.incompleto) {
+          break; // zona completa pero sin supermercados: se confirma con Overpass
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+      } catch (_) {
+        break;
+      }
+    }
   }
-  out.sort((a, b) => a.km.compareTo(b.km));
-  return out
-      .take(80)
-      .toList(); // las 80 más cercanas (Overpass no ordena por distancia)
+  try {
+    final m = (radiusKm * 1000).round();
+    final q =
+        '[out:json][timeout:25];nwr["shop"="supermarket"](around:$m,$lat,$lon);out center tags 300;';
+    final r = await consultarOverpass(q);
+    final out = <Store>[];
+    for (final e in (r['elements'] as List)) {
+      final tags = (e['tags'] as Map?)?.cast<String, dynamic>() ?? {};
+      final c = e['center'] as Map?;
+      final t = _tiendaOsm(
+        '${e['type']}',
+        e['id'] as Object,
+        tags,
+        (e['lat'] ?? c?['lat']) as num?,
+        (e['lon'] ?? c?['lon']) as num?,
+        lat,
+        lon,
+      );
+      if (t != null) out.add(t);
+    }
+    out.sort((a, b) => a.km.compareTo(b.km));
+    return out
+        .take(80)
+        .toList(); // las 80 más cercanas (Overpass no ordena por distancia)
+  } on OverpassOcupado {
+    if (parcial.isNotEmpty) {
+      return parcial; // mejor una lista incompleta de nuestra caché que ninguna
+    }
+    rethrow;
+  }
 }

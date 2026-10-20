@@ -231,7 +231,7 @@ class SettingsPage extends StatelessWidget {
                     : IconButton(
                         tooltip: 'Buscar cerca de mí',
                         icon: const Icon(Icons.refresh),
-                        onPressed: () => s.refreshStores(),
+                        onPressed: () => _pedirActualizarTiendas(context, s),
                       ),
               ),
               Padding(
@@ -250,11 +250,21 @@ class SettingsPage extends StatelessWidget {
                           c.radiusKm = v;
                           s.refresh();
                         },
-                        onChangeEnd: (_) {
-                          // al ampliar hay que descargar más; al reducir basta con filtrar
-                          c.radiusKm > s.fetchedRadiusKm
-                              ? s.refreshStores(relocate: false)
-                              : s.changed();
+                        onChangeEnd: (_) async {
+                          // al ampliar hay que descargar más (cambia la lista: se pregunta); al reducir basta con filtrar
+                          if (c.radiusKm > s.fetchedRadiusKm) {
+                            final hecho = await _pedirActualizarTiendas(
+                              context,
+                              s,
+                              relocate: false,
+                            );
+                            if (!hecho && s.fetchedRadiusKm > 0) {
+                              c.radiusKm = s.fetchedRadiusKm;
+                            }
+                            s.changed();
+                          } else {
+                            s.changed();
+                          }
                         },
                       ),
                     ),
@@ -920,4 +930,38 @@ class _LeyendaPrecio extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Actualizar la lista de supermercados cambia las tiendas de tu zona: si ya estaba creada, se pide confirmación.
+Future<bool> _pedirActualizarTiendas(
+  BuildContext context,
+  AppState s, {
+  bool relocate = true,
+}) async {
+  if (s.listaDeTiendasFijada) {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Actualizar los supermercados'),
+        content: const Text(
+          'Esto cambiará tu lista de locales de compra: se volverán a buscar los supermercados de la zona y pueden '
+          'aparecer, desaparecer o cambiar tiendas.\n\n'
+          'Las tiendas que ya usas en tu lista se conservan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Actualizar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return false;
+  }
+  await s.refreshStores(relocate: relocate);
+  return true;
 }

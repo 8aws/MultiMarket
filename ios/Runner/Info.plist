@@ -4,6 +4,10 @@
 <dict>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>loywallet</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>MultiMarket usa la cámara para fotografiar productos que no tienen imagen.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

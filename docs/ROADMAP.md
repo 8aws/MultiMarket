@@ -26,6 +26,14 @@ Al importar o escanear un ticket **después** de haber comprado:
 - Mostrar valores de Open Food Facts en la ficha (por 100 g / 100 ml; extrapolar al envase) y Nutri-Score.
 - Después: comparar por nutriente («más proteína por euro»).
 
+## Emplazamientos de compra (idea, sin diseñar)
+Poder organizar los supermercados **por lugares** que el usuario define: «cerca de casa», «cerca del trabajo», «cerca del gimnasio»,
+«casa de verano», «casa de los abuelos»… y elegir en cada momento con cuál se compra (o «ubicación actual» para compras rápidas).
+Cada emplazamiento tendría su propia lista de tiendas (fijada, con aviso al actualizarla), su radio y sus preferencias.
+Preguntas abiertas: ¿una lista de la compra por emplazamiento o una sola que reparte por tienda según dónde estés?; cómo elegir el
+emplazamiento activo (manual, por GPS al llegar, por horario); y cómo se comparte con una lista compartida. Aprovecha que la lista
+de supermercados ya está fijada y la caché de OpenStreetMap por zonas (cada emplazamiento = una celda más).
+
 ## Diseño adaptativo (iPhone Duo, iPad, escritorio)
 Estudio en `docs/DISENO_ADAPTATIVO.md`: clases de tamaño, maestro-detalle (lista + ficha), modo compra y comparar en dos
 columnas, conciencia de pliegue cuando exista el SDK 27.1, y un widget (WidgetKit) como posible vía para HomeView.

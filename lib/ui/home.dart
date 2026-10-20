@@ -244,16 +244,10 @@ class AppDrawer extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.card_membership),
               title: const Text('Tarjetas de fidelidad (Loywallet)'),
-              subtitle: const Text('Abre la app o te lleva a descargarla'),
+              subtitle: const Text('Abre LoyWallet o te lleva a descargarla'),
               onTap: () {
                 Navigator.pop(context);
-                // Sin esquema propio en Loywallet, la ficha de la App Store muestra «Abrir» si está instalada
-                launchUrl(
-                  Uri.parse(
-                    'https://apps.apple.com/es/app/loywallet/id6761814853',
-                  ),
-                  mode: LaunchMode.externalApplication,
-                );
+                abrirTarjetaFidelidad();
               },
             ),
             ListTile(
@@ -1011,6 +1005,26 @@ Future<void> _askPrice(BuildContext context, AppState s, Item it) async {
 }
 
 // ================================================== CABECERA DE TIENDA
+/// Abre la tarjeta de fidelidad de una cadena en LoyWallet (loywallet://card?chain=…&name=…).
+/// LoyWallet busca la tarjeta por nombre y, si no existe, ofrece añadirla. Si no está instalada, lleva a su ficha de la App Store.
+Future<void> abrirTarjetaFidelidad({String? chain, String? name}) async {
+  final uri = Uri(
+    scheme: 'loywallet',
+    host: 'card',
+    queryParameters: {'chain': ?chain, 'name': ?name},
+  );
+  try {
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
+  } catch (_) {}
+  await launchUrl(
+    Uri.parse('https://apps.apple.com/es/app/loywallet/id6761814853'),
+    mode: LaunchMode.externalApplication,
+  );
+}
+
 class StoreHeader extends StatelessWidget {
   const StoreHeader({super.key, required this.store, required this.items});
   final Store? store;
@@ -1055,6 +1069,15 @@ class StoreHeader extends StatelessWidget {
             ),
           ),
           Text(eur(sub), style: const TextStyle(fontWeight: FontWeight.w600)),
+          if (store != null)
+            IconButton(
+              tooltip: 'Tarjeta de fidelidad (Loywallet)',
+              icon: const Icon(Icons.card_membership),
+              onPressed: () => abrirTarjetaFidelidad(
+                chain: store!.chain,
+                name: prettyChain(store!.chain),
+              ),
+            ),
           if (store != null)
             IconButton(
               tooltip: 'Cómo llegar',

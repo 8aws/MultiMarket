@@ -49,3 +49,20 @@ guardar identificadores personales.
 ## Pendiente de decidir
 - Umbral de confianza para mostrar un precio como «verificado».
 - Política de imágenes (peso máximo, moderación, licencia de la foto).
+
+## Caché de supermercados (OpenStreetMap)
+Desde la 1.0.1 el servidor guarda una copia de los supermercados de OpenStreetMap **por celdas de 0,1°** (~10 km) en la colección
+`tiendas_cache`, para no depender de los servidores públicos de Overpass y para no cargarlos. La app pide primero
+`GET /api/mm/v1/tiendas` (con la posición redondeada a ~1 km) y, si falla, usa Overpass con varios servidores.
+
+**Licencia (ODbL) y atribución — resumen práctico, no es asesoramiento legal:**
+- Copiar y almacenar datos de OpenStreetMap está permitido. Obligaciones: **atribución** («© colaboradores de OpenStreetMap», ODbL;
+  se muestra en la app y en cada respuesta de la API) y, si se publica una base **derivada** que contenga una parte sustancial,
+  **ofrecerla bajo ODbL** (compartir igual).
+- Por eso la caché contiene **solo datos de OpenStreetMap, sin mezclar** precios, usuarios ni nada propio; se enlazan por el
+  identificador OSM (`osm:node/…`). Es una *base colectiva* con nuestros datos, no una derivada.
+- Si algún día se descarga una parte muy grande del país, hay que ofrecer ese volcado bajo ODbL (basta un `.json` descargable).
+- Overpass público: sin norma de caché; ~10 000 consultas y ~1 GB al día en la instancia principal, **sumando todos los usuarios de
+  la app**, y obliga a identificarse con `User-Agent` (la app y el servidor lo hacen). La caché reduce esa carga a una consulta
+  por celda cada 30 días.
+- Si Overpass no responde se sirve la copia antigua (cualquier antigüedad) y la respuesta lo indica.
