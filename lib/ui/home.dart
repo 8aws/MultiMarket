@@ -1064,8 +1064,9 @@ Future<void> abrirTarjetaFidelidad({String? chain, String? name}) async {
     queryParameters: params.isEmpty ? null : params,
   );
   try {
-    if (await launchUrl(web, mode: LaunchMode.externalNonBrowserApplication))
+    if (await launchUrl(web, mode: LaunchMode.externalNonBrowserApplication)) {
       return;
+    }
   } catch (_) {}
   try {
     if (await canLaunchUrl(esquema)) {
