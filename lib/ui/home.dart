@@ -1047,17 +1047,29 @@ Future<void> _askPrice(BuildContext context, AppState s, Item it) async {
 }
 
 // ================================================== CABECERA DE TIENDA
-/// Abre la tarjeta de fidelidad de una cadena en LoyWallet (loywallet://card?chain=…&name=…).
-/// LoyWallet busca la tarjeta por nombre y, si no existe, ofrece añadirla. Si no está instalada, lleva a su ficha de la App Store.
+/// Abre la tarjeta de fidelidad de una cadena en LoyWallet.
+/// 1.º universal link `https://loywallet.uverse.es/c?chain=…&name=…` (abre la app si está instalada; si no, solo lo abre una app,
+///     nunca el navegador); 2.º esquema `loywallet://card?…` (versiones que aún no lo tienen asociado al dominio);
+/// 3.º ficha de LoyWallet en la App Store. LoyWallet busca la tarjeta por nombre y, si no existe, ofrece añadirla.
 Future<void> abrirTarjetaFidelidad({String? chain, String? name}) async {
-  final uri = Uri(
+  final params = {'chain': ?chain, 'name': ?name};
+  final web = Uri.https(
+    'loywallet.uverse.es',
+    '/c',
+    params.isEmpty ? null : params,
+  );
+  final esquema = Uri(
     scheme: 'loywallet',
     host: 'card',
-    queryParameters: {'chain': ?chain, 'name': ?name},
+    queryParameters: params.isEmpty ? null : params,
   );
   try {
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (await launchUrl(web, mode: LaunchMode.externalNonBrowserApplication))
+      return;
+  } catch (_) {}
+  try {
+    if (await canLaunchUrl(esquema)) {
+      await launchUrl(esquema, mode: LaunchMode.externalApplication);
       return;
     }
   } catch (_) {}
