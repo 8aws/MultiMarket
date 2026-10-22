@@ -73,8 +73,41 @@ class _FichaState extends State<FichaProducto> {
   }
 
   void _guardarPrecio() {
-    final v = double.tryParse(_precio.text.replaceAll(',', '.'));
+    FocusScope.of(
+      context,
+    ).unfocus(); // el teclado numérico de iOS no tiene tecla de cerrar
+    final texto = _precio.text.trim();
+    final v = double.tryParse(texto.replaceAll(',', '.'));
+    final mensajes = ScaffoldMessenger.of(context);
+    if (texto.isNotEmpty && (v == null || v <= 0)) {
+      mensajes.showSnackBar(
+        const SnackBar(
+          content: Text('Escribe un precio válido, por ejemplo 1,25'),
+          showCloseIcon: true,
+          persist: false,
+        ),
+      );
+      return;
+    }
     s.setPrice(it, v, oferta: _oferta, hasta: _hasta);
+    mensajes
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            v == null
+                ? 'Precio quitado'
+                : (_oferta ? 'Oferta guardada: ' : 'Precio guardado: ') +
+                      eur(v),
+          ),
+          duration: const Duration(seconds: 3),
+          showCloseIcon: true,
+          persist: false,
+        ),
+      );
+    if (!widget.enPanel) {
+      Navigator.of(context).pop(); // en la hoja, guardar la cierra
+    }
   }
 
   @override
@@ -84,6 +117,7 @@ class _FichaState extends State<FichaProducto> {
     return ListenableBuilder(
       listenable: s,
       builder: (context, _) => SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,6 +299,8 @@ class _FichaState extends State<FichaProducto> {
                 Expanded(
                   child: TextField(
                     controller: _precio,
+                    onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                    onSubmitted: (_) => _guardarPrecio(),
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
