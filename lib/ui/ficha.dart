@@ -22,6 +22,8 @@ Future<void> showFicha(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
+    showDragHandle:
+        true, // el contenido se desplaza y se traga el gesto de bajar: el asa siempre cierra
     builder: (ctx) => Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
       child: SafeArea(
@@ -79,7 +81,7 @@ class _FichaState extends State<FichaProducto> {
     final texto = _precio.text.trim();
     final v = double.tryParse(texto.replaceAll(',', '.'));
     final mensajes = ScaffoldMessenger.of(context);
-    if (texto.isNotEmpty && (v == null || v <= 0)) {
+    if (texto.isNotEmpty && v == null) {
       mensajes.showSnackBar(
         const SnackBar(
           content: Text('Escribe un precio válido, por ejemplo 1,25'),
@@ -142,6 +144,12 @@ class _FichaState extends State<FichaProducto> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
+                if (!widget.enPanel)
+                  IconButton(
+                    tooltip: 'Cerrar',
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
               ],
             ),
             Wrap(
