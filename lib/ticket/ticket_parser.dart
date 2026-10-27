@@ -184,8 +184,17 @@ String? _codigoInterno(String n) =>
 enum _Tipo { producto, peso, descuento }
 
 class _Tok {
-  _Tok(this.tipo, {this.linea, this.kg, this.unit, this.importe});
+  _Tok(
+    this.tipo, {
+    this.linea,
+    this.kg,
+    this.unit,
+    this.importe,
+    this.unidades = false,
+  });
   final _Tipo tipo;
+  final bool
+  unidades; // «3 x 1,15 €» (unidades) en vez de «0,641 kg x 8,69 €/kg» (peso)
   TicketLinea? linea;
   final double? kg, unit, importe;
 }
@@ -199,9 +208,17 @@ String _arreglarDigitos(String l) => l
     .replaceAllMapped(
       RegExp(r'(?<=\d[.,])[lI|](?=\d)|(?<=\d)[lI|](?=[.,]\d)'),
       (_) => '1',
-    );
+    )
+    // «5,5/ €»: el 7 del importe leído como barra
+    .replaceAllMapped(RegExp(r'(?<=\d[.,]\d)/(?=\s*(?:€|eur))'), (_) => '7');
 
 /// Interpreta un ticket a partir de sus líneas de texto.
+// «3 x 1,15 €» suelto (Aldi: unidades × precio, en la línea ANTES del producto)
+final _cantidadSolaRe = RegExp(
+  r'^(\d+)\s*[x×]\s*(' + _precio + r')\s*(?:€|eur)?$',
+  caseSensitive: false,
+);
+
 const _nombreVacio = '(sin nombre)';
 
 TicketLinea _sinNombre(double imp, {String? iva}) =>
@@ -251,7 +268,130 @@ List<String> _unirPrecios(List<String> ls) {
   return res;
 }
 
+/// Interpreta un ticket. Si no cuadra con su total, reintenta emparejando nombres e importes por ORDEN
+/// (fotos torcidas o curvadas: el OCR separa cada nombre de su importe y los reparte en filas distintas)
+/// y se queda con la lectura que mejor cuadre.
 Ticket parsearTicket(List<String> crudas) {
+  final primero = _parsear(crudas);
+  if (primero.cuadra || primero.total == null) return primero;
+  final rep = _parsear(_repararPorOrden(crudas));
+  // la cabecera se descarta al reparar: cadena y fecha salen de la primera lectura
+  final alt = Ticket(
+    lineas: rep.lineas,
+    cadena: rep.cadena ?? primero.cadena,
+    fecha: rep.fecha ?? primero.fecha,
+    total: rep.total,
+    descuentoGlobal: rep.descuentoGlobal,
+  );
+  if (alt.cuadra) return alt;
+  final dp = primero.diferencia!.abs(), da = alt.diferencia?.abs() ?? dp;
+  return da < dp || (da == dp && alt.dudosas.length < primero.dudosas.length)
+      ? alt
+      : primero;
+}
+
+final _pesoSueltoRe = RegExp(
+  r'(\d+[.,]\d{2,3})\s*kg\s*[x×*]\s*(' +
+      _precio +
+      r')\s*(?:€|eur)?(?:\s*/\s*kg)?',
+  caseSensitive: false,
+);
+final _cantidadInicioRe = RegExp(
+  r'^(\d+)\s*[x×]\s*(' + _precio + r')\s*(?:€|eur)?\s*',
+  caseSensitive: false,
+);
+final _nombreYPrecioRe = RegExp(
+  r'^(.*?)\s*(' + _precio + r')\s*(?:€|£|eur)?\s*(?:\S{1,3})?$',
+  caseSensitive: false,
+);
+
+String _coma(double v, int dec) => v.toStringAsFixed(dec).replaceAll('.', ',');
+
+/// Reconstruye el cuerpo emparejando el N-ésimo nombre con el N-ésimo importe, sin fiarse de la fila.
+/// Las líneas «N x precio» y «kg x €/kg» se asocian al producto cuyo importe cuadra (el siguiente o el anterior).
+/// Solo se usa cuando la lectura normal no cuadra, y el resultado se vuelve a validar contra el total.
+List<String> _repararPorOrden(List<String> crudas) {
+  final ls = [
+    for (final l in crudas)
+      if (l.trim().isNotEmpty)
+        _arreglarDigitos(l.replaceAll(RegExp(r'[ \t]+'), ' ').trim()),
+  ];
+  var fin = ls.length;
+  for (var i = 0; i < ls.length; i++) {
+    if (_anclaFinRe.hasMatch(ls[i]) && !_descuentoRe.hasMatch(ls[i])) {
+      fin = i;
+      break;
+    }
+  }
+  // eventos en orden de lectura
+  final nombres = <String>[];
+  final importes = <double>[];
+  final extras = <({int pos, double kg, double unit, bool unidades})>[];
+  for (var i = 0; i < fin; i++) {
+    var r = ls[i];
+    final q = _cantidadInicioRe.firstMatch(r);
+    if (q != null) {
+      extras.add((
+        pos: nombres.length,
+        kg: double.parse(q.group(1)!),
+        unit: _num(q.group(2)!)!,
+        unidades: true,
+      ));
+      r = r.substring(q.end).trim();
+    }
+    final w = _pesoSueltoRe.firstMatch(r);
+    if (w != null) {
+      extras.add((
+        pos: nombres.length,
+        kg: _num(w.group(1)!)!,
+        unit: _num(w.group(2)!)!,
+        unidades: false,
+      ));
+      r = r.replaceRange(w.start, w.end, '').trim();
+    }
+    if (r.isEmpty) continue;
+    final m = _nombreYPrecioRe.firstMatch(r);
+    var nombre = r;
+    if (m != null) {
+      nombre = m.group(1)!.trim();
+      importes.add(_num(m.group(2)!)!);
+    }
+    if (RegExp(r'[A-Za-zÁÉÍÓÚÑáéíóúñ]{3,}').hasMatch(nombre) &&
+        !_noProductoRe.hasMatch(nombre)) {
+      nombres.add(nombre);
+    }
+  }
+  // la cabecera (dirección, horario…) es texto sin importe: sobra al principio
+  if (nombres.length > importes.length) {
+    final sobran = nombres.length - importes.length;
+    nombres.removeRange(0, sobran);
+    for (var k = 0; k < extras.length; k++) {
+      extras[k] = (
+        pos: (extras[k].pos - sobran).clamp(0, nombres.length),
+        kg: extras[k].kg,
+        unit: extras[k].unit,
+        unidades: extras[k].unidades,
+      );
+    }
+  }
+  final out = <String>[];
+  for (var k = 0; k < importes.length; k++) {
+    // el propio parser decide si cada línea de cantidad/peso describe al producto anterior o al siguiente
+    for (final e in extras.where((e) => e.pos == k)) {
+      out.add(
+        e.unidades
+            ? '${e.kg.toInt()} x ${_coma(e.unit, 2)} €'
+            : '${_coma(e.kg, 3)} kg x ${_coma(e.unit, 2)} €/kg',
+      );
+    }
+    out.add(
+      '${k < nombres.length ? nombres[k] : ''} ${_coma(importes[k], 2)} €',
+    );
+  }
+  return [...out, ...ls.skip(fin)];
+}
+
+Ticket _parsear(List<String> crudas) {
   final lineas = _unirPrecios([
     for (final l in crudas)
       if (l.trim().isNotEmpty)
@@ -321,6 +461,18 @@ Ticket parsearTicket(List<String> crudas) {
     if (w != null) {
       toks.add(
         _Tok(_Tipo.peso, kg: _num(w.group(1)!), unit: _num(w.group(2)!)),
+      );
+      continue;
+    }
+    final q = _cantidadSolaRe.firstMatch(l);
+    if (q != null) {
+      toks.add(
+        _Tok(
+          _Tipo.peso,
+          kg: double.parse(q.group(1)!),
+          unit: _num(q.group(2)!),
+          unidades: true,
+        ),
       );
       continue;
     }
@@ -503,14 +655,16 @@ Ticket parsearTicket(List<String> crudas) {
       if (anteriores.isNotEmpty) toks[anteriores.last].linea!,
       if (siguientes.isNotEmpty) toks[siguientes.first].linea!,
     ]) {
-      if (!c.porPeso && (c.bruto - esperado).abs() <= 0.02) {
+      if (!c.porPeso &&
+          !(t.unidades && c.cantidad != null) &&
+          (c.bruto - esperado).abs() <= 0.02) {
         elegido = c;
         break;
       }
     }
     if (elegido != null) {
       elegido
-        ..porPeso = true
+        ..porPeso = !t.unidades
         ..cantidad = t.kg
         ..unitario = t.unit;
     }

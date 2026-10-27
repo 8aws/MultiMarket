@@ -26,7 +26,9 @@ List<String> agruparPorFilas(List<FragmentoOcr> fr) {
     if (fila != null) {
       final cy = fila.fold(0.0, (t, x) => t + x.centroY) / fila.length;
       final alto = fila.fold(0.0, (t, x) => t + x.alto) / fila.length;
-      if ((f.centroY - cy).abs() <= alto * .5) {
+      // dos textos que ocupan el mismo tramo horizontal no son la misma fila (foto torcida: dos nombres seguidos)
+      final solapa = fila.any((g) => f.izq < g.derecha && g.izq < f.derecha);
+      if ((f.centroY - cy).abs() <= alto * .5 && !solapa) {
         fila.add(f);
         continue;
       }

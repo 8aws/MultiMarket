@@ -62,9 +62,11 @@ Future<List<List<String>>> _leerPdf(String ruta) async {
         continue;
       }
       // página escaneada: se dibuja a imagen y se pasa por OCR
-      final alto = 2400.0;
+      // por ANCHO: un ticket largo y estrecho dibujado a «2400 de alto» queda en ~570 px de ancho y el OCR pierde líneas
+      final ancho = 1600.0;
+      final alto = (ancho * p.height / p.width).clamp(1.0, 9000.0);
       final im = await p.render(
-        fullWidth: alto * p.width / p.height,
+        fullWidth: alto == 9000.0 ? 9000.0 * p.width / p.height : ancho,
         fullHeight: alto,
         backgroundColor: 0xffffffff,
       );

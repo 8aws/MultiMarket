@@ -42,52 +42,60 @@ void main() {
     expect(await productByBarcode('0000000000000'), isNull);
   }, skip: live ? false : 'MM_LIVE=1');
 
-  test('precios equivalentes de Open Prices (puede no haber datos)', () async {
-    final base = (await searchProducts('leche entera')).first;
-    final eq = await equivalentOpenPrices(base);
-    expect(eq.values.every((q) => q.equivalente && q.price != null), isTrue);
-    // ignore: avoid_print
-    print('equivalentes: ${eq.map((k, q) => MapEntry(k, q.price))}');
-  }, skip: live ? false : 'MM_LIVE=1');
+  test(
+    'precios equivalentes de Open Prices (puede no haber datos)',
+    () async {
+      final base = (await searchProducts('leche entera')).first;
+      final eq = await equivalentOpenPrices(base);
+      expect(eq.values.every((q) => q.equivalente && q.price != null), isTrue);
+      // ignore: avoid_print
+      print('equivalentes: ${eq.map((k, q) => MapEntry(k, q.price))}');
+    },
+    skip: live ? false : 'MM_LIVE=1',
+  );
 
-  test('proponer producto nuevo a la base común (una sola vez)', () async {
-    SharedPreferences.setMockInitialValues({});
-    final s = AppState(await SharedPreferences.getInstance());
-    s.cfg.serverUrl = Platform.environment['MM_URL'] ?? '';
-    final nombre = 'Producto de prueba ${PbApi.randomId(6)}';
-    final p = Product(
-      name: '$nombre · Marca',
-      cold: true,
-      quantity: '500 g',
-      genericKey: 'prueba|500g',
-    );
-    try {
-      await s.proponerProducto(p);
-      expect(s.proponidos, contains(p.key));
-      // segunda vez: no vuelve a llamar
-      await s.proponerProducto(p);
-      // y mientras esté pendiente no aparece en la búsqueda pública
-      expect(await s.sync.api.buscarProductos(nombre), isEmpty);
-    } finally {
+  test(
+    'proponer producto nuevo a la base común (una sola vez)',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final s = AppState(await SharedPreferences.getInstance());
+      s.cfg.serverUrl = Platform.environment['MM_URL'] ?? '';
+      final nombre = 'Producto de prueba ${PbApi.randomId(6)}';
+      final p = Product(
+        name: '$nombre · Marca',
+        cold: true,
+        quantity: '500 g',
+        genericKey: 'prueba|500g',
+      );
       try {
-        // primero el producto de prueba (solo su autor puede retirarlo) y después la cuenta
-        final r = await s.sync.api.call(
-          'GET',
-          '/api/collections/productos/records',
-          query: {'filter': "key='${p.key}'"},
-        );
-        for (final m in (r['items'] as List)) {
+        await s.proponerProducto(p);
+        expect(s.proponidos, contains(p.key));
+        // segunda vez: no vuelve a llamar
+        await s.proponerProducto(p);
+        // y mientras esté pendiente no aparece en la búsqueda pública
+        expect(await s.sync.api.buscarProductos(nombre), isEmpty);
+      } finally {
+        try {
+          // primero el producto de prueba (solo su autor puede retirarlo) y después la cuenta
+          final r = await s.sync.api.call(
+            'GET',
+            '/api/collections/productos/records',
+            query: {'filter': "key='${p.key}'"},
+          );
+          for (final m in (r['items'] as List)) {
+            await s.sync.api.call(
+              'DELETE',
+              '/api/collections/productos/records/${m['id']}',
+            );
+          }
           await s.sync.api.call(
             'DELETE',
-            '/api/collections/productos/records/${m['id']}',
+            '/api/collections/users/records/${s.sync.api.userId}',
           );
-        }
-        await s.sync.api.call(
-          'DELETE',
-          '/api/collections/users/records/${s.sync.api.userId}',
-        );
-      } catch (_) {}
-      s.dispose();
-    }
-  }, skip: live ? false : 'MM_LIVE=1');
+        } catch (_) {}
+        s.dispose();
+      }
+    },
+    skip: live ? false : 'MM_LIVE=1',
+  );
 }

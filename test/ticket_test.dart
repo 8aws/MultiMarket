@@ -183,21 +183,25 @@ void main() {
     final ruta = Platform.environment['MM_TICKETS'];
     final dir = ruta == null ? null : Directory(ruta);
     final hay = dir != null && dir.existsSync();
-    test('cada ticket real cuadra con su total impreso', () {
-      final ficheros = dir!.listSync().whereType<File>().where(
-        (f) => f.path.endsWith('.txt'),
-      );
-      expect(ficheros, isNotEmpty);
-      for (final f in ficheros) {
-        final t = parsearTicket(f.readAsLinesSync());
-        expect(t.lineas, isNotEmpty, reason: f.path);
-        expect(
-          t.cuadra,
-          isTrue,
-          reason: '${f.path}: diferencia ${t.diferencia}',
+    test(
+      'cada ticket real cuadra con su total impreso',
+      () {
+        final ficheros = dir!.listSync().whereType<File>().where(
+          (f) => f.path.endsWith('.txt'),
         );
-      }
-    }, skip: hay ? false : 'define MM_TICKETS para probar tickets reales');
+        expect(ficheros, isNotEmpty);
+        for (final f in ficheros) {
+          final t = parsearTicket(f.readAsLinesSync());
+          expect(t.lineas, isNotEmpty, reason: f.path);
+          expect(
+            t.cuadra,
+            isTrue,
+            reason: '${f.path}: diferencia ${t.diferencia}',
+          );
+        }
+      },
+      skip: hay ? false : 'define MM_TICKETS para probar tickets reales',
+    );
   });
 }
 
@@ -293,6 +297,53 @@ void ticketsSinTotalTests() {
         'P 13 QV021026_50V 2Q OCT 1,05',
       ]);
       expect(t.lineas.map((l) => l.nombre), ['PAN PUEBLO']);
+    },
+  );
+
+  test(
+    'Aldi con la cantidad ANTES del producto («2 x 2,49 €») y la foto torcida',
+    () {
+      final t = parsearTicket(
+        File('test/fixtures/tickets/aldi_foto_torcida2.txt').readAsLinesSync(),
+      );
+      expect(t.cadena, 'aldi');
+      expect(t.total, 25.89);
+      expect(t.cuadra, isTrue, reason: 'dif ${t.diferencia}');
+      final brownie = t.lineas.firstWhere(
+        (l) => l.nombre.startsWith('BROWNIE'),
+      );
+      expect(brownie.bruto, 4.98);
+      expect(brownie.cantidad, 2);
+      expect(
+        t.lineas.any((l) => RegExp(r'^\d+ ?x').hasMatch(l.nombre)),
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'Aldi foto torcida: nombres e importes en filas distintas se emparejan por orden',
+    () {
+      final t = parsearTicket(
+        File('test/fixtures/tickets/aldi_foto_torcida.txt').readAsLinesSync(),
+      );
+      expect(t.total, 78.15);
+      expect(t.cuadra, isTrue, reason: 'dif ${t.diferencia}');
+      expect(t.lineas, hasLength(21));
+      expect(t.dudosas, isEmpty);
+      double precio(String n) =>
+          t.lineas.firstWhere((l) => l.nombre.startsWith(n)).bruto;
+      expect(precio('BROWNIE'), 4.98);
+      expect(
+        precio('CACAHUETES'),
+        3.18,
+        reason: '«5,5/» no debe romper el orden',
+      );
+      expect(precio('SOLOM.POLLO'), 5.57, reason: '7 leído como barra');
+      final chispas = t.lineas.firstWhere(
+        (l) => l.nombre.startsWith('CHISPAS'),
+      );
+      expect(chispas.descuento, -0.8);
     },
   );
 }
