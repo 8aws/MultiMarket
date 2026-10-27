@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'demo_capturas.dart';
 import 'notifier.dart';
 import 'state.dart';
+import 'ui/adaptativo.dart';
 import 'ui/home.dart';
 
 Future<void> main() async {
@@ -66,6 +67,7 @@ class MultiMarketApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: _theme(Brightness.light),
         darkTheme: _theme(Brightness.dark),
+        builder: (context, child) => MargenesLaterales(child: child!),
         home: const HomePage(),
       ),
     );

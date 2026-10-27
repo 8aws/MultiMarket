@@ -21,6 +21,16 @@ void main() {
     expect(claseVentana(1000), ClaseVentana.expandida);
   });
 
+  test(
+    'dos paneles: ancho y alto suficientes (Duo interior horizontal sí, vertical e iPhone horizontal no)',
+    () {
+      expect(cabenDosPaneles(const Size(951, 669)), isTrue);
+      expect(cabenDosPaneles(const Size(669, 951)), isFalse);
+      expect(cabenDosPaneles(const Size(932, 430)), isFalse);
+      expect(cabenDosPaneles(const Size(1024, 768)), isTrue);
+    },
+  );
+
   testWidgets('pantalla ancha: lista y ficha lado a lado, sin hoja modal', (
     tester,
   ) async {

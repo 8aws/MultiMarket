@@ -12,9 +12,9 @@ import '../ticket/ticket_lector.dart';
 import '../ticket/ticket_match.dart';
 import '../ticket/ticket_parser.dart';
 
-/// Hacer la foto del ticket con la cámara se activará en una versión futura (el OCR de fotos aún falla con los textos).
-/// Importar un PDF o una imagen guardada sigue disponible.
-const permitirFotoTicket = false;
+/// Hacer la foto del ticket con la cámara. Si la foto sale torcida o cortada la lectura falla, por eso se avisa en pantalla;
+/// poner `false` la desactiva sin tocar la importación de PDF o imagen guardada.
+const permitirFotoTicket = true;
 
 void abrirImportarTicket(BuildContext context) => Navigator.of(
   context,
@@ -276,6 +276,24 @@ class _TicketPageState extends State<TicketPage> {
               AppScope.of(context).changed();
             },
           ),
+          if (permitirFotoTicket && hayOcr)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, size: 18, color: cs.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Para que la foto se lea bien, el ticket debe verse ENTERO, recto y bien iluminado: '
+                      'sobre una superficie plana, sin dobleces ni sombras, con la cámara de frente y sin cortar ninguna línea.',
+                      style: TextStyle(fontSize: 13, color: cs.onSurface),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,

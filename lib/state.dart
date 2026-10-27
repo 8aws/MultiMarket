@@ -478,49 +478,78 @@ class AppState extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Vuelca los datos de una copia (del servidor o de un archivo) sobre la lista privada de este dispositivo.
+  void _aplicarCopia(Map<String, dynamic> d) {
+    void guarda(String k, Object? v) => _prefs.setString(k, jsonEncode(v));
+    guarda('items:${Hogar.privadaId}', d['items'] ?? []);
+    guarda('offers:${Hogar.privadaId}', d['offers'] ?? []);
+    guarda('compras:${Hogar.privadaId}', d['compras'] ?? []);
+    guarda('recompra:${Hogar.privadaId}', d['recompra'] ?? {});
+    for (final k in [
+      'exclusivos',
+      'frioManual',
+      'aliasTicket',
+      'imagenesUrl',
+    ]) {
+      final actual = jsonDecode(_prefs.getString(k) ?? '{}') as Map;
+      guarda(k, {...((d[k] as Map?) ?? {}), ...actual});
+    }
+    final loc = jsonDecode(_prefs.getString('local') ?? '{}') as Map;
+    guarda('local', {...((d['local'] as Map?) ?? {}), ...loc});
+    for (final m in [
+      exclusivos,
+      frioManual,
+      aliasTicket,
+      imagenesUrl,
+      _local,
+    ]) {
+      m.clear();
+    }
+    _lists.clear();
+    _compras.clear();
+    _descartes.clear();
+    _offers.clear();
+    _load();
+    copiaParaRestaurar = null;
+    changed();
+  }
+
   /// Restaura la lista privada desde la copia del servidor. Devuelve un mensaje de error o null si fue bien.
   Future<String?> restaurarCopia() async {
     try {
       final c = await sync.api.copiaActual();
       if (c == null) return 'No hay copia en el servidor';
-      final d = (c['datos'] as Map).cast<String, dynamic>();
-      void guarda(String k, Object? v) => _prefs.setString(k, jsonEncode(v));
-      guarda('items:${Hogar.privadaId}', d['items'] ?? []);
-      guarda('offers:${Hogar.privadaId}', d['offers'] ?? []);
-      guarda('compras:${Hogar.privadaId}', d['compras'] ?? []);
-      guarda('recompra:${Hogar.privadaId}', d['recompra'] ?? {});
-      for (final k in [
-        'exclusivos',
-        'frioManual',
-        'aliasTicket',
-        'imagenesUrl',
-      ]) {
-        final actual = jsonDecode(_prefs.getString(k) ?? '{}') as Map;
-        guarda(k, {...((d[k] as Map?) ?? {}), ...actual});
-      }
-      final loc = jsonDecode(_prefs.getString('local') ?? '{}') as Map;
-      guarda('local', {...((d['local'] as Map?) ?? {}), ...loc});
-      for (final m in [
-        exclusivos,
-        frioManual,
-        aliasTicket,
-        imagenesUrl,
-        _local,
-      ]) {
-        m.clear();
-      }
-      _lists.clear();
-      _compras.clear();
-      _descartes.clear();
-      _offers.clear();
-      _load();
-      copiaParaRestaurar = null;
-      changed();
+      _aplicarCopia((c['datos'] as Map).cast<String, dynamic>());
       return null;
     } on PbException catch (e) {
       return e.message;
     } catch (_) {
       return 'No se pudo restaurar la copia';
+    }
+  }
+
+  /// Contenido de la copia en un archivo `.json` que el usuario guarda donde quiera (iCloud Drive, Archivos, AirDrop…).
+  /// No lleva fotos propias ni datos de la cuenta del servidor: lista privada, historial, precios y ajustes de producto.
+  List<int> copiaEnArchivo() => utf8.encode(
+    jsonEncode({
+      'multimarket': 1,
+      'version': versionApp,
+      'fecha': DateTime.now().toIso8601String(),
+      'datos': _datosCopia(),
+    }),
+  );
+
+  /// Restaura desde un archivo creado con [copiaEnArchivo]. Devuelve un mensaje de error o null si fue bien.
+  String? restaurarDeArchivo(String texto) {
+    try {
+      final j = jsonDecode(texto);
+      if (j is! Map || j['multimarket'] != 1 || j['datos'] is! Map) {
+        return 'Este archivo no es una copia de MultiMarket';
+      }
+      _aplicarCopia((j['datos'] as Map).cast<String, dynamic>());
+      return null;
+    } catch (_) {
+      return 'No se pudo leer el archivo';
     }
   }
 

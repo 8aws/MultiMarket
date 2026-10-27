@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -671,6 +675,87 @@ class SettingsPage extends StatelessWidget {
                   } else {
                     await s.borrarCopiaServidor();
                   }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.ios_share),
+                title: const Text('Guardar una copia en un archivo'),
+                subtitle: const Text(
+                  'Lista privada, historial y precios en un archivo que guardas tú (iCloud Drive, Archivos…). No usa el servidor.',
+                ),
+                onTap: () async {
+                  final mensajes = ScaffoldMessenger.of(context);
+                  final fecha = DateTime.now().toIso8601String().substring(
+                    0,
+                    10,
+                  );
+                  try {
+                    final r = await FilePicker.saveFile(
+                      fileName: 'multimarket-copia-$fecha.json',
+                      bytes: Uint8List.fromList(s.copiaEnArchivo()),
+                      mimeType: 'application/json',
+                      type: FileType.custom,
+                      allowedExtensions: ['json'],
+                    );
+                    if (r != null) {
+                      mensajes.showSnackBar(
+                        const SnackBar(
+                          content: Text('Copia guardada'),
+                          showCloseIcon: true,
+                        ),
+                      );
+                    }
+                  } catch (_) {
+                    mensajes.showSnackBar(
+                      const SnackBar(
+                        content: Text('No se pudo guardar el archivo'),
+                        showCloseIcon: true,
+                      ),
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.file_open_outlined),
+                title: const Text('Restaurar desde un archivo'),
+                subtitle: const Text(
+                  'Sustituye tu lista privada, historial y precios por los del archivo.',
+                ),
+                onTap: () async {
+                  final mensajes = ScaffoldMessenger.of(context);
+                  final f = await FilePicker.pickFile(
+                    type: FileType.custom,
+                    allowedExtensions: ['json'],
+                  );
+                  if (f == null || !context.mounted) return;
+                  final ok = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('¿Restaurar la copia?'),
+                      content: const Text(
+                        'Tu lista privada, historial y precios actuales se sustituirán por los del archivo.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancelar'),
+                        ),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Restaurar'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (ok != true) return;
+                  final texto = utf8.decode(await f.readAsBytes());
+                  final error = s.restaurarDeArchivo(texto);
+                  mensajes.showSnackBar(
+                    SnackBar(
+                      content: Text(error ?? 'Copia restaurada'),
+                      showCloseIcon: true,
+                    ),
+                  );
                 },
               ),
               SwitchListTile(
