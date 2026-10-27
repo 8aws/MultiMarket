@@ -108,3 +108,19 @@ historial y ajustes en maestro-detalle. **Pantalla interior del iPhone Duo:** en
 (`xcrun simctl io <dispositivo> screenConfig --display=primary-1 power on`; `primary` = exterior 1398×2034, `primary-1` = interior
 2007×2853), pero la captura de la interior falla y no se puede cambiar la pose desde la línea de comandos: hay que usar la interfaz
 de Device Hub. Con el ancho de la interior (≈ 670 pt @3x) el diseño de dos paneles se activaría (umbral 700 dp); **falta medirlo**.
+
+## 9. iPhone Duo: medidas y decisiones (2026-10-27)
+
+Medidas tomadas en el simulador (3×), contrastadas con los hilos uFeed y LoyWallet:
+
+| Modo | Píxeles | Puntos |
+|---|---|---|
+| Exterior | 1398×2034 | 466×678 |
+| Interior vertical | 2007×2853 | 669×951 (inset superior 82, inferior 34) |
+| Interior horizontal | 2853×2007 | 951×669 |
+
+- **Dos paneles:** ancho ≥ 700 **y** alto ≥ 560 (`cabenDosPaneles`). El interior horizontal (951×669) usa dos paneles; el interior vertical (669 de ancho) y el exterior, uno. Un iPhone en horizontal (alto ~430) no los usa. uFeed usa el mismo criterio (`useTwoPane`), además de «ancho > alto».
+- **Franja lateral del sistema** (~84 pt con cámara, hora y cobertura en el exterior y en el interior horizontal): llega como `MediaQuery.padding.left/right`. Se respeta UNA vez para toda la app con `MargenesLaterales` (builder de `MaterialApp`) y se pone a 0 para los hijos. Verificado en el exterior: ninguna pantalla queda bajo la franja.
+- **Plegar y girar:** no hay API de bisagra ni de postura en Flutter iOS; la app ve una ventana que cambia de tamaño y recalcula en cada `build` (`MediaQuery.sizeOf`).
+- **Capturas:** `xcrun simctl io <udid> screenshot --display=1` (exterior) o `--display=3` (interior); sin `--display` falla con dos pantallas. El modo se cambia a mano desde Device Hub. Con el dispositivo en modo exterior, `--display=3` sale en negro.
+- **Probado:** exterior (lista, menú, historial, ficha con asa). **Pendiente de probar:** interior vertical y horizontal (hay que cambiar el modo a mano).

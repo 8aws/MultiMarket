@@ -13,6 +13,7 @@ TITULOS = {
     "3_menu": ("Escáner, ofertas, comparador", "y listas compartidas"),
     "4_ficha": ("Frío, cantidad y precio", "al detalle"),
     "5_oscuro": ("También en modo oscuro", ""),
+    "6_historial": ("Tu historial de compras,", "ordenado por año y mes"),
 }
 
 
