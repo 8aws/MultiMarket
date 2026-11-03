@@ -124,3 +124,11 @@ Medidas tomadas en el simulador (3×), contrastadas con los hilos uFeed y LoyWal
 - **Plegar y girar:** no hay API de bisagra ni de postura en Flutter iOS; la app ve una ventana que cambia de tamaño y recalcula en cada `build` (`MediaQuery.sizeOf`).
 - **Capturas:** `xcrun simctl io <udid> screenshot --display=1` (exterior) o `--display=3` (interior); sin `--display` falla con dos pantallas. El modo se cambia a mano desde Device Hub. Con el dispositivo en modo exterior, `--display=3` sale en negro.
 - **Probado:** exterior (lista, menú, historial, ficha con asa). **Pendiente de probar:** interior vertical y horizontal (hay que cambiar el modo a mano).
+
+## 10. Pantalla ancha en horizontal: pendiente de diseño (2026-11-03)
+
+Pedido del usuario: el panel derecho con la ficha está bien pero necesita icono de cerrar (hecho). El resto del espacio debe aprovecharse de forma más práctica e intuitiva. Opciones a valorar (no decididas):
+1. Dos listas independientes: «Solo fríos» a un lado y «Sin refrigerar» al otro.
+2. Una tienda (o grupo de tiendas) en cada panel.
+3. Lista unificada a dos columnas.
+El resto de modos (compacto y vertical) se dejan como están.
