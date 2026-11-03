@@ -49,6 +49,15 @@ Disponible en español. Pensada para supermercados de España.
 ## Qué hay de nuevo (1.0)
 Primera versión: listas privadas y compartidas, selección automática de supermercado, escáner de códigos, historial, ofertas con aviso y cadena de frío.
 
+## Qué hay de nuevo (1.1.0)
+- Información nutricional de los productos (Open Food Facts): por 100 g, por envase, Nutri-Score y NOVA.
+- Historial de compras plegable por año, mes y ticket.
+- Importa tickets desde PDF, imagen o con la cámara (con consejos para que la foto se lea bien); lectura mejorada para Aldi, Carrefour, Lidl y El Corte Inglés.
+- Copia de seguridad en un archivo que guardas tú, y restauración desde ese archivo.
+- Disponible también en iPad, con lista y ficha lado a lado.
+- Enlace directo a tu tarjeta de fidelidad en LoyWallet.
+- La ficha del producto se cierra con un asa y una X, y el precio vacío o 0 se guarda como «sin precio».
+
 ## Notas para el equipo de revisión
 - No hace falta cuenta ni contraseña: la app crea una cuenta anónima de dispositivo en el primer uso.
 - Contenido generado por usuarios: las fotos y los productos nuevos se envían a moderación antes de ser públicos; hay botón «Reportar» en cada foto, sanciones progresivas a cuentas que suban contenido inadecuado y contacto en multimarket@uverse.es.

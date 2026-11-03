@@ -11,7 +11,7 @@ App Store Connect, que haces tú con tu cuenta.
 | Nombre en la App Store | MultiMarket: Lista de súper |
 | Versión / build | 1.0.0 (1) — súbele el build en cada envío: `flutter build ipa --release --export-method app-store --build-number=2` |
 | iOS mínimo | 16.0 |
-| Dispositivos | solo iPhone (no pide capturas de iPad) |
+| Dispositivos | iPhone y iPad desde 1.1.0 (build 10): pide capturas de iPad 13" (`store/capturas_ipad_13/`, 2064 × 2752) |
 | Idioma de la interfaz | español (España) |
 | Cifrado | solo HTTPS estándar: `ITSAppUsesNonExemptEncryption = NO` ya incluido |
 | Privacy manifest | `ios/Runner/PrivacyInfo.xcprivacy` (sin seguimiento; ID de usuario, contenido de usuario y fotos, funcionalidad de la app) |

@@ -103,45 +103,59 @@ class HistorialPage extends StatelessWidget {
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-      children: [
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.receipt_long_outlined),
-            title: Text(
-              'Compras en «${s.hogar.name}»',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Text('${lista.length} productos'),
-            trailing: Text(
-              eur(total),
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-          ),
-        ),
-        for (final y in anios)
-          Card(
-            clipBehavior: Clip.antiAlias,
-            child: ExpansionTile(
-              key: PageStorageKey('anio$y'),
-              initiallyExpanded: y == abierto.$1,
-              title: Text(
-                '$y',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              trailing: Text(
-                eur(
-                  [for (final m in meses.where((m) => m.$1 == y)) ...porMes[m]!]
-                      .fold(0.0, (t, k) => t + k.total),
+    // en pantallas anchas el texto de lectura no se estira de borde a borde
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 760),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+          children: [
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.receipt_long_outlined),
+                title: Text(
+                  'Compras en «${s.hogar.name}»',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                subtitle: Text('${lista.length} productos'),
+                trailing: Text(
+                  eur(total),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
               ),
-              children: [for (final m in meses.where((m) => m.$1 == y)) mes(m)],
             ),
-          ),
-      ],
+            for (final y in anios)
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: ExpansionTile(
+                  key: PageStorageKey('anio$y'),
+                  initiallyExpanded: y == abierto.$1,
+                  title: Text(
+                    '$y',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  trailing: Text(
+                    eur(
+                      [
+                        for (final m in meses.where((m) => m.$1 == y))
+                          ...porMes[m]!,
+                      ].fold(0.0, (t, k) => t + k.total),
+                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  children: [
+                    for (final m in meses.where((m) => m.$1 == y)) mes(m),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

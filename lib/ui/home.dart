@@ -151,6 +151,7 @@ class _HomePageState extends State<HomePage> {
           0 =>
             dosPaneles(context)
                 ? const Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Expanded(flex: 5, child: ListPage()),
                       VerticalDivider(width: 1),
