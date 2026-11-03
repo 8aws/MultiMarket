@@ -144,12 +144,14 @@ class _FichaState extends State<FichaProducto> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
-                if (!widget.enPanel)
-                  IconButton(
-                    tooltip: 'Cerrar',
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
+                IconButton(
+                  tooltip: 'Cerrar',
+                  icon: const Icon(Icons.close),
+                  // en el panel ancho «cerrar» quita la selección; en la hoja, la cierra
+                  onPressed: () => widget.enPanel
+                      ? s.seleccionar(null)
+                      : Navigator.of(context).pop(),
+                ),
               ],
             ),
             Wrap(
