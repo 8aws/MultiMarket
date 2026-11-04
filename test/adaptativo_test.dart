@@ -31,6 +31,64 @@ void main() {
     },
   );
 
+  test('punto de corte: dos mitades seguidas con el mismo peso', () {
+    expect(puntoDeCorte([]), isNull);
+    expect(puntoDeCorte([5]), isNull);
+    expect(puntoDeCorte([3, 3]), 1);
+    expect(puntoDeCorte([6, 2, 2, 2]), 1);
+    expect(puntoDeCorte([2, 2, 2, 6]), 3);
+    expect(puntoDeCorte([4, 3, 3, 4]), 2);
+  });
+
+  testWidgets(
+    'horizontal ancho: frío y sin refrigerar en dos columnas; la ficha va en hoja',
+    (tester) async {
+      tester.view.physicalSize = const Size(951, 669);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      SharedPreferences.setMockInitialValues({});
+      final s = AppState(await SharedPreferences.getInstance());
+      s.add(const Product(name: 'Leche entera 1L', cold: true));
+      s.add(const Product(name: 'Arroz 1kg'));
+      await tester.pumpWidget(MultiMarketApp(s));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.textContaining('Sin refrigerar ·'), findsOneWidget);
+      expect(find.textContaining('Fríos ·'), findsOneWidget);
+      expect(
+        find.text('Elige un producto de la lista para ver y editar su ficha.'),
+        findsNothing,
+        reason: 'el lado derecho está en uso',
+      );
+      await tester.tap(find.text('Arroz 1kg'));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(BottomSheet), findsOneWidget);
+      s.dispose();
+    },
+  );
+
+  testWidgets(
+    'horizontal ancho con todo seco: no hay nada que repartir y el panel muestra la ficha',
+    (tester) async {
+      tester.view.physicalSize = const Size(951, 669);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      SharedPreferences.setMockInitialValues({});
+      final s = AppState(await SharedPreferences.getInstance());
+      s.add(const Product(name: 'Arroz 1kg'));
+      await tester.pumpWidget(MultiMarketApp(s));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(
+        find.text('Elige un producto de la lista para ver y editar su ficha.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Arroz 1kg'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(FichaProducto), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+      s.dispose();
+    },
+  );
+
   testWidgets('pantalla ancha: lista y ficha lado a lado, sin hoja modal', (
     tester,
   ) async {

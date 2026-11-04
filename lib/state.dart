@@ -2019,16 +2019,17 @@ class AppState extends ChangeNotifier {
     return offerList.where((o) => o.daysLeft <= d).toList();
   }
 
-  List<Item> get visible {
-    final l = items
-        .where(
-          (i) => switch (filter) {
-            ColdFilter.todo => true,
-            ColdFilter.frio => i.cold,
-            ColdFilter.seco => !i.cold,
-          },
-        )
-        .toList();
+  List<Item> get visible => itemsOrdenados(
+    (i) => switch (filter) {
+      ColdFilter.todo => true,
+      ColdFilter.frio => i.cold,
+      ColdFilter.seco => !i.cold,
+    },
+  );
+
+  /// Productos que cumplen [cumple], con los pendientes antes que los comprados y por urgencia.
+  List<Item> itemsOrdenados(bool Function(Item) cumple) {
+    final l = items.where(cumple).toList();
     l.sort((a, b) {
       if (a.done != b.done) return a.done ? 1 : -1;
       if (a.urg != b.urg) return a.urg - b.urg;

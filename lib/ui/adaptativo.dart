@@ -48,3 +48,34 @@ class MargenesLaterales extends StatelessWidget {
     );
   }
 }
+
+/// ¿Está libre el panel derecho para la ficha? Lo dice la vista ancha: si ese lado ya muestra otra lista,
+/// la ficha se abre en una hoja sobre ella. Sin vista ancha por encima, depende solo del tamaño.
+class PanelDisponible extends InheritedWidget {
+  const PanelDisponible({super.key, required this.libre, required super.child});
+  final bool libre;
+
+  static bool de(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<PanelDisponible>()?.libre ??
+      dosPaneles(context);
+
+  @override
+  bool updateShouldNotify(PanelDisponible old) => libre != old.libre;
+}
+
+/// Punto donde partir una secuencia de bloques (por su «peso») en dos mitades seguidas lo más parejas posible.
+/// Devuelve cuántos bloques van a la izquierda, o null si hay menos de dos bloques (no hay nada que repartir).
+int? puntoDeCorte(List<int> pesos) {
+  if (pesos.length < 2) return null;
+  final total = pesos.fold(0, (a, b) => a + b);
+  var izq = 0, mejor = 1, dif = total;
+  for (var k = 1; k < pesos.length; k++) {
+    izq += pesos[k - 1];
+    final d = (total - 2 * izq).abs();
+    if (d < dif) {
+      dif = d;
+      mejor = k;
+    }
+  }
+  return mejor;
+}

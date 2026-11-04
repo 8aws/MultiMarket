@@ -148,17 +148,7 @@ class _HomePageState extends State<HomePage> {
       body: SafeArea(
         top: false,
         child: switch (s.tab) {
-          0 =>
-            dosPaneles(context)
-                ? const Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(flex: 5, child: ListPage()),
-                      VerticalDivider(width: 1),
-                      Expanded(flex: 4, child: PanelDetalle()),
-                    ],
-                  )
-                : const ListPage(),
+          0 => dosPaneles(context) ? const VistaAncha() : const ListPage(),
           1 => const OffersPage(),
           3 => const HistorialPage(),
           _ => const SettingsPage(),
@@ -340,93 +330,7 @@ class ListPage extends StatelessWidget {
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 88), // hueco para el «+»
       children: [
-        const SyncBanner(),
-        if (s.copiaParaRestaurar != null)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Hay una copia de tu lista privada del ${s.copiaParaRestaurar!.day}/${s.copiaParaRestaurar!.month}/${s.copiaParaRestaurar!.year}. ¿Quieres recuperarla?',
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      FilledButton(
-                        onPressed: () async {
-                          final e = await s.restaurarCopia();
-                          if (e != null && context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(e),
-                                showCloseIcon: true,
-                                persist: false,
-                              ),
-                            );
-                          }
-                        },
-                        child: const Text('Recuperar'),
-                      ),
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: () {
-                          s.copiaParaRestaurar = null;
-                          s.changed();
-                        },
-                        child: const Text('Ahora no'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        if (!s.puedeCompartir)
-          Card(
-            color: Theme.of(context).colorScheme.errorContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  const Icon(Icons.block, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      s.textoSancion!,
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        if (s.cfg.showColdCard) const ColdBanner(),
-        const ExpiringOffersBanner(),
-        if (s.cfg.showCartCard) const CartCard(),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 8,
-          runSpacing:
-              0, // en pantallas estrechas los filtros pasan a otra línea en lugar de cortarse
-          children: [
-            for (final e in const {
-              ColdFilter.todo: 'Todo',
-              ColdFilter.frio: '❄️ Solo fríos',
-              ColdFilter.seco: '🧺 Sin refrigerar',
-            }.entries)
-              ChoiceChip(
-                label: Text(e.value),
-                selected: s.filter == e.key,
-                onSelected: (_) {
-                  s.filter = e.key;
-                  s.refresh();
-                },
-              ),
-          ],
-        ),
+        ...ListPage.cabecera(context, s),
         if (items.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 48),
@@ -460,6 +364,105 @@ class ListPage extends StatelessWidget {
     );
   }
 
+  /// Avisos, tarjeta de la cesta y filtros de frío. En la vista ancha dividida los filtros sobran: la división ya los hace.
+  static List<Widget> cabecera(
+    BuildContext context,
+    AppState s, {
+    bool filtros = true,
+  }) {
+    return [
+      const SyncBanner(),
+      if (s.copiaParaRestaurar != null)
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hay una copia de tu lista privada del ${s.copiaParaRestaurar!.day}/${s.copiaParaRestaurar!.month}/${s.copiaParaRestaurar!.year}. ¿Quieres recuperarla?',
+                  style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    FilledButton(
+                      onPressed: () async {
+                        final e = await s.restaurarCopia();
+                        if (e != null && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(e),
+                              showCloseIcon: true,
+                              persist: false,
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Recuperar'),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: () {
+                        s.copiaParaRestaurar = null;
+                        s.changed();
+                      },
+                      child: const Text('Ahora no'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      if (!s.puedeCompartir)
+        Card(
+          color: Theme.of(context).colorScheme.errorContainer,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                const Icon(Icons.block, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    s.textoSancion!,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      if (s.cfg.showColdCard) const ColdBanner(),
+      const ExpiringOffersBanner(),
+      if (s.cfg.showCartCard) const CartCard(),
+      const SizedBox(height: 6),
+      if (filtros) ...[
+        Wrap(
+          spacing: 8,
+          runSpacing:
+              0, // en pantallas estrechas los filtros pasan a otra línea en lugar de cortarse
+          children: [
+            for (final e in const {
+              ColdFilter.todo: 'Todo',
+              ColdFilter.frio: '❄️ Solo fríos',
+              ColdFilter.seco: '🧺 Sin refrigerar',
+            }.entries)
+              ChoiceChip(
+                label: Text(e.value),
+                selected: s.filter == e.key,
+                onSelected: (_) {
+                  s.filter = e.key;
+                  s.refresh();
+                },
+              ),
+          ],
+        ),
+      ],
+    ];
+  }
+
   /// Sugerencias de recompra: anotaciones «fantasma» al 50 %. Tocar la fila las añade a la lista;
   /// tocar el círculo las descarta sin contar como compra.
   List<Widget> _fantasmas(BuildContext context, AppState s) {
@@ -488,47 +491,183 @@ class ListPage extends StatelessWidget {
     ];
   }
 
-  List<Widget> _byStore(BuildContext context, AppState s, List<Item> items) {
-    final groups = <String?, List<Item>>{};
-    for (final i in items) {
-      groups.putIfAbsent(i.storeId, () => []).add(i);
+  List<Widget> _byStore(BuildContext context, AppState s, List<Item> items) => [
+    for (final e in gruposPorTienda(s, items)) tarjetaTienda(s, e),
+  ];
+}
+
+typedef GrupoTienda = MapEntry<String?, List<Item>>;
+
+/// Productos agrupados por tienda: 1º tiendas con pendientes (lo más urgente antes, luego la más cercana),
+/// 2º «sin asignar», 3º tiendas ya terminadas.
+List<GrupoTienda> gruposPorTienda(AppState s, List<Item> items) {
+  final groups = <String?, List<Item>>{};
+  for (final i in items) {
+    groups.putIfAbsent(i.storeId, () => []).add(i);
+  }
+  int urgOf(List<Item> g) => g
+      .where((i) => !i.done)
+      .map((i) => i.urg)
+      .fold(9, (a, b) => a < b ? a : b);
+  bool finished(List<Item> g) => g.every((i) => i.done);
+  int rank(GrupoTienda e) => finished(e.value)
+      ? 2
+      : (e.key == null || s.storeById(e.key) == null ? 1 : 0);
+  return groups.entries.toList()..sort((a, b) {
+    final r = rank(a) - rank(b);
+    if (r != 0) return r;
+    final u = urgOf(a.value) - urgOf(b.value);
+    if (u != 0) return u;
+    final ka = s.storeById(a.key)?.km ?? 99, kb = s.storeById(b.key)?.km ?? 99;
+    return ka.compareTo(kb);
+  });
+}
+
+Widget tarjetaTienda(AppState s, GrupoTienda e) {
+  final finished = e.value.every((i) => i.done);
+  return Card(
+    margin: const EdgeInsets.only(top: 12),
+    clipBehavior: Clip.antiAlias,
+    child: Opacity(
+      opacity: finished ? .6 : 1,
+      child: Column(
+        children: [
+          StoreHeader(store: s.storeById(e.key), items: e.value),
+          for (final i in e.value) ItemRow(i, showStore: false),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Pantalla ancha en horizontal: reparte la lista en dos columnas útiles y deja el panel de la ficha
+/// para cuando ese lado no está en uso.
+///  · «Por compra»: sin refrigerar a la izquierda, fríos a la derecha.
+///  · «Por tienda»: las tiendas en dos bloques seguidos con el mismo peso.
+/// Si solo hay un grupo (todo frío, una sola tienda…) no hay nada que repartir y el lado derecho muestra la ficha.
+class VistaAncha extends StatelessWidget {
+  const VistaAncha({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final cs = Theme.of(context).colorScheme;
+    List<Widget>? izq, der;
+    String? tIzq, tDer;
+    if (s.view == ViewMode.compra) {
+      final seco = s.itemsOrdenados((i) => !i.cold);
+      final frio = s.itemsOrdenados((i) => i.cold);
+      if (seco.isNotEmpty && frio.isNotEmpty) {
+        tIzq = '🧺 Sin refrigerar · ${seco.length}';
+        tDer = '❄️ Fríos · ${frio.length}';
+        izq = [
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: Column(children: [for (final i in seco) ItemRow(i)]),
+          ),
+        ];
+        der = [
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: Column(children: [for (final i in frio) ItemRow(i)]),
+          ),
+        ];
+      }
+    } else {
+      final grupos = gruposPorTienda(s, s.visible);
+      final k = puntoDeCorte([for (final g in grupos) g.value.length + 2]);
+      if (k != null) {
+        izq = [for (final g in grupos.take(k)) tarjetaTienda(s, g)];
+        der = [for (final g in grupos.skip(k)) tarjetaTienda(s, g)];
+      }
     }
-    // 1º tiendas con pendientes (lo más urgente antes, luego la más cercana),
-    // 2º "sin asignar", 3º tiendas ya terminadas
-    int urgOf(List<Item> g) => g
-        .where((i) => !i.done)
-        .map((i) => i.urg)
-        .fold(9, (a, b) => a < b ? a : b);
-    bool finished(List<Item> g) => g.every((i) => i.done);
-    int rank(MapEntry<String?, List<Item>> e) => finished(e.value)
-        ? 2
-        : (e.key == null || s.storeById(e.key) == null ? 1 : 0);
-    final entries = groups.entries.toList()
-      ..sort((a, b) {
-        final r = rank(a) - rank(b);
-        if (r != 0) return r;
-        final u = urgOf(a.value) - urgOf(b.value);
-        if (u != 0) return u;
-        final ka = s.storeById(a.key)?.km ?? 99,
-            kb = s.storeById(b.key)?.km ?? 99;
-        return ka.compareTo(kb);
-      });
-    return [
-      for (final e in entries)
-        Card(
-          margin: const EdgeInsets.only(top: 12),
-          clipBehavior: Clip.antiAlias,
-          child: Opacity(
-            opacity: finished(e.value) ? .6 : 1,
-            child: Column(
+    final dividida = izq != null && der != null;
+
+    Widget titulo(String t) => Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+      child: Text(
+        t,
+        style: TextStyle(fontSize: 13, color: cs.outline, letterSpacing: .3),
+      ),
+    );
+    Widget columna(String? t, List<Widget> hijos, {bool shrink = false}) =>
+        ListView(
+          shrinkWrap: shrink,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 88),
+          children: [if (t != null) titulo(t), ...hijos],
+        );
+
+    if (!dividida) {
+      return const PanelDisponible(
+        libre: true,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(flex: 5, child: ListPage()),
+            VerticalDivider(width: 1),
+            Expanded(flex: 4, child: PanelDetalle()),
+          ],
+        ),
+      );
+    }
+    final alto = MediaQuery.sizeOf(context).height;
+    // ¿queda hueco libre bajo la lista de la derecha para la ficha? (estimación: ~58 pt por producto, ~76 por cabecera)
+    final usado = s.view == ViewMode.compra
+        ? s.itemsOrdenados((i) => i.cold).length * 58 + 80
+        : [
+            for (final g in gruposPorTienda(s, s.visible).skip(
+              puntoDeCorte([
+                    for (final g in gruposPorTienda(s, s.visible))
+                      g.value.length + 2,
+                  ]) ??
+                  0,
+            ))
+              g.value.length * 58 + 88,
+          ].fold(0, (a, b) => a + b);
+    final libre = alto - 160 - usado >= 380;
+    final sel = s.seleccionado;
+    final conFicha = libre && sel != null && s.allItems.contains(sel);
+    return PanelDisponible(
+      libre: libre,
+      child: Column(
+        children: [
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: alto * .4),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+              child: Column(
+                children: ListPage.cabecera(
+                  context,
+                  s,
+                  filtros: s.view != ViewMode.compra,
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                StoreHeader(store: s.storeById(e.key), items: e.value),
-                for (final i in e.value) ItemRow(i, showStore: false),
+                Expanded(child: columna(tIzq, izq)),
+                const VerticalDivider(width: 1),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Flexible(child: columna(tDer, der, shrink: conFicha)),
+                      if (conFicha) ...[
+                        const Divider(height: 1),
+                        const Expanded(flex: 2, child: PanelDetalle()),
+                      ],
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
-        ),
-    ];
+        ],
+      ),
+    );
   }
 }
 
@@ -853,8 +992,8 @@ class ItemRow extends StatelessWidget {
       ),
       onDismissed: (_) => s.remove(item),
       child: ListTile(
-        selected: dosPaneles(context) && s.seleccionado == item,
-        onTap: () => dosPaneles(context)
+        selected: PanelDisponible.de(context) && s.seleccionado == item,
+        onTap: () => PanelDisponible.de(context)
             ? s.seleccionar(
                 item,
               ) // pantalla ancha: la ficha se abre en el panel de la derecha

@@ -125,10 +125,11 @@ Medidas tomadas en el simulador (3×), contrastadas con los hilos uFeed y LoyWal
 - **Capturas:** `xcrun simctl io <udid> screenshot --display=1` (exterior) o `--display=3` (interior); sin `--display` falla con dos pantallas. El modo se cambia a mano desde Device Hub. Con el dispositivo en modo exterior, `--display=3` sale en negro.
 - **Probado:** exterior (lista, menú, historial, ficha con asa). **Pendiente de probar:** interior vertical y horizontal (hay que cambiar el modo a mano).
 
-## 10. Pantalla ancha en horizontal: pendiente de diseño (2026-11-03)
+## 10. Pantalla ancha en horizontal: dos columnas útiles (2026-11-04)
 
-Pedido del usuario: el panel derecho con la ficha está bien pero necesita icono de cerrar (hecho). El resto del espacio debe aprovecharse de forma más práctica e intuitiva. Opciones a valorar (no decididas):
-1. Dos listas independientes: «Solo fríos» a un lado y «Sin refrigerar» al otro.
-2. Una tienda (o grupo de tiendas) en cada panel.
-3. Lista unificada a dos columnas.
-El resto de modos (compacto y vertical) se dejan como están.
+Decidido con el usuario: el lado derecho se usa para algo práctico y la ficha solo ocupa el hueco libre.
+- **«Por compra»:** sin refrigerar a la izquierda, fríos a la derecha. Los filtros de frío se ocultan (la división ya filtra).
+- **«Por tienda»:** las tiendas se reparten en dos bloques seguidos con el mismo peso (`puntoDeCorte`).
+- **Ficha:** si bajo la lista de la derecha queda hueco (≥ ~380 pt estimados), se muestra ahí, con icono de cerrar. Si esa columna está llena, se abre en hoja sobre las listas (`PanelDisponible`).
+- **Un solo grupo** (todo frío o seco, una sola tienda): no hay nada que repartir; lista + panel de ficha como antes.
+- Verificado en el simulador de iPad 13" en horizontal. **Pendiente:** el Duo interior horizontal (951×669).
