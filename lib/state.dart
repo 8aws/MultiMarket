@@ -1682,6 +1682,24 @@ class AppState extends ChangeNotifier {
     changed();
   }
 
+  /// Minutos sin comprar nada tras los que se considera que ya no sigues en el mismo súper.
+  static const minutosDeSesion = 20;
+
+  /// Tienda de la sesión de compra en curso: la de la última compra marcada hace menos de [minutosDeSesion] minutos.
+  /// Si compras seguido, sigues en el mismo súper aunque el GPS dude entre dos tiendas pegadas; pasado ese margen
+  /// se puede haber cambiado de sitio y manda la ubicación. [salvo] excluye el producto que se está marcando.
+  Store? tiendaDeSesion({String? salvo, DateTime? ahora}) {
+    final t = (ahora ?? DateTime.now()).millisecondsSinceEpoch;
+    Compra? ultima;
+    for (final c in compras) {
+      if (c.itemId == salvo || c.storeId == null) continue;
+      final edad = t - c.ms;
+      if (edad < 0 || edad > minutosDeSesion * 60000) continue;
+      if (ultima == null || c.ms > ultima.ms) ultima = c;
+    }
+    return ultima == null ? null : storeById(ultima.storeId);
+  }
+
   /// Guarda en el historial que se ha comprado este producto (con su precio, tienda y cantidad de ese momento).
   void _registrarCompra(Item it) {
     final p = productOf(it);

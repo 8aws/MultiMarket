@@ -83,4 +83,37 @@ void main() {
     expect(s.ultimasFusionadas, 2);
     s.dispose();
   });
+
+  test(
+    'sesión de compra: compras seguidas en <20 min mantienen la tienda; pasado ese margen, no',
+    () async {
+      final s = await estado();
+      final st = s.stores.first;
+      final ahora = DateTime(2026, 11, 20, 12, 0);
+      Compra c(String id, int minutosAntes) => Compra(
+        id: id.padRight(15, '0'),
+        itemId: id,
+        key: id,
+        name: id,
+        qty: 1,
+        storeId: st.id,
+        storeName: st.name,
+        ms: ahora
+            .subtract(Duration(minutes: minutosAntes))
+            .millisecondsSinceEpoch,
+      );
+      s.compras.add(c('uno', 5));
+      expect(s.tiendaDeSesion(ahora: ahora)?.id, st.id);
+      expect(
+        s.tiendaDeSesion(salvo: 'uno', ahora: ahora),
+        isNull,
+        reason: 'el propio producto no cuenta',
+      );
+      s.compras
+        ..clear()
+        ..add(c('viejo', 30));
+      expect(s.tiendaDeSesion(ahora: ahora), isNull);
+      s.dispose();
+    },
+  );
 }
