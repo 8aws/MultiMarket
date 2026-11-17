@@ -220,15 +220,17 @@ class _TicketPageState extends State<TicketPage> {
 
   void _aplicar() {
     final s = AppScope.of(context);
-    var marcados = 0, lineas = 0;
+    var marcados = 0, lineas = 0, fusionadas = 0;
     for (final r in leidos!) {
       marcados += s.aplicarTicket(r.ticket, r.cruces, elegidos: r.elegidos);
+      fusionadas += s.ultimasFusionadas;
       lineas += r.ticket.lineas.length;
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '$lineas productos guardados en el historial · $marcados marcados en la lista',
+          '$lineas productos guardados en el historial · $marcados marcados en la lista'
+          '${fusionadas == 0 ? '' : ' · $fusionadas ya estaban ese día: no se duplican'}',
         ),
         behavior: SnackBarBehavior.floating,
         showCloseIcon: true,
@@ -417,6 +419,9 @@ class _Linea extends StatelessWidget {
               ? '${l.cantidad!.round()} ud'
               : null);
     final s = AppScope.of(context);
+    final String? asignado = r.elegidos.containsKey(i)
+        ? (r.elegidos[i]!.isEmpty ? null : r.elegidos[i])
+        : (c.estado == EstadoCruce.seguro ? c.itemId : null);
     return InkWell(
       onTap: () => _editarLineaTicket(context, s, r, l, refrescar),
       child: Padding(
@@ -447,12 +452,7 @@ class _Linea extends StatelessWidget {
             ),
             if (l.nota != null)
               Text(l.nota!, style: TextStyle(fontSize: 12, color: cs.error)),
-            if (c.estado == EstadoCruce.seguro)
-              Text(
-                '✓ ${nombreItem(c.itemId) ?? 'de la lista'}',
-                style: const TextStyle(fontSize: 12, color: Colors.green),
-              )
-            else if (c.estado == EstadoCruce.dudoso)
+            if (c.estado == EstadoCruce.dudoso && !r.elegidos.containsKey(i))
               DropdownButton<String?>(
                 isExpanded: true,
                 isDense: true,
@@ -473,9 +473,37 @@ class _Linea extends StatelessWidget {
                 },
               )
             else
-              Text(
-                'Nuevo: solo al historial',
-                style: TextStyle(fontSize: 12, color: cs.outline),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      asignado == null
+                          ? 'Nuevo: solo al historial'
+                          : '✓ ${nombreItem(asignado) ?? 'de la lista'}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: asignado == null ? cs.outline : Colors.green,
+                      ),
+                    ),
+                  ),
+                  // asignar a mano siempre: líneas sin reconocer o mal reconocidas
+                  PopupMenuButton<String>(
+                    tooltip: 'Asignar a un producto de la lista',
+                    icon: const Icon(Icons.swap_horiz, size: 20),
+                    onSelected: (v) {
+                      r.elegidos[i] = v;
+                      refrescar();
+                    },
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(
+                        value: '',
+                        child: Text('Ninguno (solo al historial)'),
+                      ),
+                      for (final it in pend)
+                        PopupMenuItem(value: it.id, child: Text(it.name)),
+                    ],
+                  ),
+                ],
               ),
           ],
         ),

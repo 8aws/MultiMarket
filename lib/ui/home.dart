@@ -1536,6 +1536,8 @@ class _AddSheetState extends State<AddSheet> {
   Product? _porCodigo;
   bool _buscandoCodigo = false;
   bool _searching = false;
+  int _unidades =
+      1; // cuántas unidades se añaden de golpe (manual o por código)
 
   @override
   void dispose() {
@@ -1668,6 +1670,7 @@ class _AddSheetState extends State<AddSheet> {
     final s = AppScope.of(context);
     p = s.conFrio(s.conExclusivo(p));
     final it = s.add(p);
+    if (_unidades > 1) s.setCantidad(it, _unidades);
     Navigator.pop(context, (it, p));
   }
 
@@ -1724,6 +1727,38 @@ class _AddSheetState extends State<AddSheet> {
                     : 'Añadir solo a mi lista',
                 onPressed: text.isEmpty ? null : _enviar,
                 icon: const Icon(Icons.add),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              const SizedBox(width: 4),
+              const Text('Unidades'),
+              const Spacer(),
+              IconButton(
+                tooltip: 'Menos',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.remove_circle_outline),
+                onPressed: _unidades > 1
+                    ? () => setState(() => _unidades--)
+                    : null,
+              ),
+              SizedBox(
+                width: 28,
+                child: Text(
+                  '$_unidades',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Más',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.add_circle_outline),
+                onPressed: () => setState(() => _unidades++),
               ),
             ],
           ),

@@ -20,6 +20,18 @@ void main() {
     expect(r[1].itemId, 'b');
   });
 
+  test('«CAR» (de Carmencita) no se confunde con «carnes»', () {
+    final lista2 = [Candidato('c', 'Carnes'), Candidato('d', 'Cebolla')];
+    final r = cruzarTicket(t(['CEBOLLA EN POLVO CAR']), lista2);
+    expect(
+      r.single.itemId,
+      'd',
+      reason: 'por «cebolla», que sí aparece entera',
+    );
+    final r2 = cruzarTicket(t(['PIMENTON DULCE CAR']), lista2);
+    expect(r2.single.estado, EstadoCruce.nuevo);
+  });
+
   test('lo que no está en la lista es nuevo', () {
     final r = cruzarTicket(t(['CHOCOLATE NEGRO 85%']), lista);
     expect(r.single.estado, EstadoCruce.nuevo);

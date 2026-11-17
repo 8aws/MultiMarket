@@ -1262,8 +1262,14 @@ class AppState extends ChangeNotifier {
   }
 
   void assign(Item it, Option? o) {
+    // un precio escrito por ti antes de tener tienda no se pierde al asignarla (la asignación automática llega tarde,
+    // tras consultar precios) salvo que esa tienda sí tenga precio conocido
+    final manual =
+        it.storeId == null &&
+        it.price != null &&
+        !confPrecio.containsKey(it.id);
     it.storeId = o?.store.id;
-    it.price = o?.price;
+    if (!(manual && o != null && o.price == null)) it.price = o?.price;
     final c = o?.quote?.conf;
     if (c == null) {
       confPrecio.remove(it.id);
@@ -1408,7 +1414,7 @@ class AppState extends ChangeNotifier {
   /// nunca lo pide al marcar una compra. Reutiliza la última posición durante 90 s.
   ({double lat, double lon, DateTime t})? _pos;
 
-  Future<Store?> tiendaActual() async {
+  Future<Store?> tiendaActual({Store? preferida}) async {
     if (!cfg.detectarTienda) return null;
     try {
       final perm = await Geolocator.checkPermission();
@@ -1427,7 +1433,7 @@ class AppState extends ChangeNotifier {
       return tiendaMasCercana(_pos!.lat, _pos!.lon, [
         ...stores,
         ...extraStores.values,
-      ]);
+      ], preferida: preferida);
     } catch (_) {
       return null;
     }
@@ -1499,6 +1505,9 @@ class AppState extends ChangeNotifier {
     ], alias: alias);
   }
 
+  /// Cuántas líneas del último ticket aplicado ya estaban en el historial de ese día (no se duplicaron).
+  int ultimasFusionadas = 0;
+
   /// Aplica el ticket: los cruces «seguros» y los dudosos que el usuario resolvió (`elegidos`: línea → id de item)
   /// marcan su producto como comprado; TODAS las líneas pasan al historial y a los precios propios.
   /// Los dudosos sin resolver y los nuevos solo se guardan como compras sueltas. Devuelve cuántos de la lista se marcaron.
@@ -1511,10 +1520,18 @@ class AppState extends ChangeNotifier {
     final st = tienda ?? tiendaDeTicket(t);
     final ms = (t.fecha ?? DateTime.now()).millisecondsSinceEpoch;
     var marcados = 0;
+    ultimasFusionadas = 0;
+    final consumidas = <String>{};
+    final dia = DateTime.fromMillisecondsSinceEpoch(ms);
+    bool mismoDia(DateTime a) =>
+        a.year == dia.year && a.month == dia.month && a.day == dia.day;
     final observaciones = <Map<String, dynamic>>[];
     for (var i = 0; i < cruces.length; i++) {
       final c = cruces[i], l = c.linea;
-      final id = c.estado == EstadoCruce.seguro ? c.itemId : elegidos[i];
+      // lo elegido a mano manda siempre (cadena vacía = «ninguno»); si no, solo los cruces seguros
+      final id = elegidos.containsKey(i)
+          ? (elegidos[i]!.isEmpty ? null : elegidos[i])
+          : (c.estado == EstadoCruce.seguro ? c.itemId : null);
       final it = id == null ? null : items.where((x) => x.id == id).firstOrNull;
       final unidades = l.porPeso ? 1 : (l.cantidad ?? 1).round().clamp(1, 999);
       final pagado =
@@ -1559,8 +1576,35 @@ class AppState extends ChangeNotifier {
               '${f.year}-${f.month.toString().padLeft(2, '0')}-${f.day.toString().padLeft(2, '0')}',
         });
       }
-      compras.add(
-        Compra(
+      // si esa compra ya está en el historial ese mismo día (marcada en la tienda o el mismo ticket importado dos veces),
+      // se completa con los datos del ticket en lugar de duplicarla
+      final previa = compras.indexWhere(
+        (c) =>
+            !consumidas.contains(c.id) &&
+            mismoDia(c.fecha) &&
+            (c.storeId == null || st == null || c.storeId == st.id) &&
+            (c.key == key ||
+                cobertura(c.name, l.nombre) >= 1 ||
+                cobertura(nombre, c.name) >= 1),
+      );
+      if (previa >= 0) {
+        final c = compras[previa];
+        consumidas.add(c.id);
+        compras[previa] = Compra(
+          id: c.id,
+          itemId: c.itemId,
+          key: c.key,
+          name: c.name,
+          qty: unidades,
+          price: pagado,
+          storeId: st?.id ?? c.storeId,
+          storeName: st?.name ?? c.storeName,
+          ms: c.ms,
+          by: c.by,
+        );
+        ultimasFusionadas++;
+      } else {
+        final nueva = Compra(
           id: PbApi.randomId(),
           itemId: it?.id ?? 'ticket',
           key: key,
@@ -1571,8 +1615,10 @@ class AppState extends ChangeNotifier {
           storeName: st?.name,
           ms: ms,
           by: sync.miId,
-        ),
-      );
+        );
+        consumidas.add(nueva.id);
+        compras.add(nueva);
+      }
       if (it != null) marcados++;
     }
     changed();
@@ -1620,7 +1666,9 @@ class AppState extends ChangeNotifier {
     if (it.done) {
       _registrarCompra(it);
       // en segundo plano: no retrasa la marca
-      tiendaActual().then((st) => reasignarSiOtraTienda(it, st));
+      tiendaActual(
+        preferida: storeById(it.storeId),
+      ).then((st) => reasignarSiOtraTienda(it, st));
     } else {
       _deshacerCompra(it);
     }

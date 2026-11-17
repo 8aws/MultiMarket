@@ -423,20 +423,33 @@ class LineaComparar {
 }
 
 /// La tienda más cercana (dentro de `maxMetros`) a una posición, o null si ninguna está lo bastante cerca.
+/// Si hay una tienda [preferida] (la que ya tenía el producto) casi igual de cerca (dentro de `margenMetros` de la más
+/// cercana), gana ella: dos supermercados pegados no se distinguen con el error normal del GPS y no hay que cambiar
+/// de tienda por unos metros.
 Store? tiendaMasCercana(
   double lat,
   double lon,
   Iterable<Store> candidatas, {
   double maxMetros = 150,
+  Store? preferida,
+  double margenMetros = 120,
 }) {
   Store? mejor;
   var dMejor = double.infinity;
+  double? dPreferida;
   for (final s in candidatas) {
     final d = haversineKm(lat, lon, s.lat, s.lon) * 1000;
+    if (s.id == preferida?.id) dPreferida = d;
     if (d <= maxMetros && d < dMejor) {
       mejor = s;
       dMejor = d;
     }
+  }
+  if (preferida != null &&
+      dPreferida != null &&
+      dPreferida <= maxMetros &&
+      dPreferida <= dMejor + margenMetros) {
+    return preferida;
   }
   return mejor;
 }
