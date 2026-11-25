@@ -1628,6 +1628,38 @@ class AppState extends ChangeNotifier {
     return marcados;
   }
 
+  /// Muestra de desarrollo: texto leído, resultado final e imagen de un ticket, para revisar y mejorar la lectura.
+  /// Solo si lo activas en Ajustes (modo desarrollo) y el administrador ha autorizado tu usuario. Devuelve un mensaje de
+  /// error o null si fue bien (o no estaba activado).
+  Future<String?> subirMuestra({
+    required String fuente,
+    required List<Map<String, dynamic>> fragmentos,
+    required List<List<String>> lineas,
+    required List<Map<String, dynamic>> resultado,
+    List<int>? imagen,
+    String? nombreImagen,
+  }) async {
+    if (!cfg.muestrasTickets) return null;
+    try {
+      await sync.api.subirMuestra(
+        version: versionApp,
+        fuente: fuente,
+        fragmentos: fragmentos,
+        lineas: lineas,
+        resultado: resultado,
+        imagen: imagen,
+        nombreImagen: nombreImagen,
+      );
+      return null;
+    } on PbException catch (e) {
+      return e.status == 403
+          ? 'El servidor no autoriza este usuario para enviar muestras'
+          : e.message;
+    } catch (_) {
+      return 'No se pudo enviar la muestra';
+    }
+  }
+
   // --------------------------------------------------------------- avisos
   /// «Voy yo»: avisa al resto de la lista compartida de que vas a hacer la compra.
   Future<String?> voyYo() async {

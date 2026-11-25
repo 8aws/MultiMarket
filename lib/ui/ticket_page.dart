@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -19,6 +20,16 @@ const permitirFotoTicket = true;
 void abrirImportarTicket(BuildContext context) => Navigator.of(
   context,
 ).push(MaterialPageRoute(builder: (_) => const TicketPage()));
+
+/// Lo necesario para enviar una muestra de desarrollo al aplicar el ticket (solo si está activada en Ajustes).
+class _Muestra {
+  _Muestra(this.fuente, this.fragmentos, this.bytes, this.nombre);
+  final String fuente;
+  final List<Map<String, dynamic>> fragmentos;
+  final List<int>? bytes;
+  final String? nombre;
+  List<List<String>> lineas = [];
+}
 
 class _Leido {
   _Leido(this.ticket, this.cruces);
@@ -129,12 +140,17 @@ class TicketPage extends StatefulWidget {
 
 class _TicketPageState extends State<TicketPage> {
   List<_Leido>? leidos;
+  _Muestra? _muestra;
   bool trabajando = false;
   String? error;
 
   Future<void> _procesar(List<List<String>> tickets) async {
     final s = AppScope.of(context);
     final l = <_Leido>[];
+    if (s.cfg.muestrasTickets) {
+      _muestra ??= _Muestra('texto', const [], null, null);
+      _muestra!.lineas = tickets;
+    }
     for (final lineas in tickets) {
       final t = parsearTicket(lineas);
       if (t.lineas.isEmpty) continue;
@@ -161,7 +177,26 @@ class _TicketPageState extends State<TicketPage> {
       error = null;
     });
     try {
-      await _procesar(await leerTickets(ruta));
+      final s = AppScope.of(context);
+      List<int>? bytes;
+      if (s.cfg.muestrasTickets) {
+        try {
+          final f = File(ruta);
+          if (await f.length() <= 8 * 1024 * 1024) {
+            bytes = await f.readAsBytes();
+          }
+        } catch (_) {}
+      }
+      final lineas = await leerTickets(ruta);
+      if (s.cfg.muestrasTickets) {
+        _muestra = _Muestra(
+          ultimaFuente,
+          [...ultimosFragmentos],
+          bytes,
+          ruta.split('/').last.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_'),
+        );
+      }
+      await _procesar(lineas);
     } catch (e) {
       setState(() => error = 'No se pudo leer el ticket ($e)');
     } finally {
@@ -221,10 +256,55 @@ class _TicketPageState extends State<TicketPage> {
   void _aplicar() {
     final s = AppScope.of(context);
     var marcados = 0, lineas = 0, fusionadas = 0;
+    final resultado = <Map<String, dynamic>>[
+      for (final r in leidos!)
+        {
+          'cadena': r.ticket.cadena,
+          'total': r.ticket.total,
+          'cuadra': r.ticket.cuadra,
+          'lineas': [
+            for (var i = 0; i < r.cruces.length; i++)
+              {
+                'nombre': r.cruces[i].linea.nombre,
+                'bruto': r.cruces[i].linea.bruto,
+                'descuento': r.cruces[i].linea.descuento,
+                'cantidad': r.cruces[i].linea.cantidad,
+                'dudosa': r.cruces[i].linea.dudosa,
+                'cruce': r.cruces[i].estado.name,
+                // a qué producto de tu lista se asignó (por nombre), tras tus correcciones
+                'asignado': s.items
+                    .where(
+                      (x) =>
+                          x.id ==
+                          (r.elegidos.containsKey(i)
+                              ? r.elegidos[i]
+                              : (r.cruces[i].estado == EstadoCruce.seguro
+                                    ? r.cruces[i].itemId
+                                    : null)),
+                    )
+                    .map((x) => x.name)
+                    .firstOrNull,
+              },
+          ],
+        },
+    ];
+    final muestra = _muestra;
     for (final r in leidos!) {
       marcados += s.aplicarTicket(r.ticket, r.cruces, elegidos: r.elegidos);
       fusionadas += s.ultimasFusionadas;
       lineas += r.ticket.lineas.length;
+    }
+    if (muestra != null) {
+      unawaited(
+        s.subirMuestra(
+          fuente: muestra.fuente,
+          fragmentos: muestra.fragmentos,
+          lineas: muestra.lineas,
+          resultado: resultado,
+          imagen: muestra.bytes,
+          nombreImagen: muestra.nombre,
+        ),
+      );
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

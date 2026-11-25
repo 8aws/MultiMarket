@@ -20,8 +20,15 @@ bool get _hayOcr => !kIsWeb && Platform.isIOS;
 
 const _canalOcr = MethodChannel('es.uverse.multimarket/ocr');
 
+/// Lo que devolvió el OCR en la última lectura (texto y posición de cada fragmento) y de qué venía.
+/// Solo se usa para las muestras de desarrollo; se sobrescribe en cada lectura.
+List<Map<String, dynamic>> ultimosFragmentos = [];
+String ultimaFuente = '';
+
 Future<List<List<String>>> leerTickets(String ruta) async {
   final esPdf = ruta.toLowerCase().endsWith('.pdf');
+  ultimosFragmentos = [];
+  ultimaFuente = esPdf ? 'pdf' : 'imagen';
   return esPdf ? _leerPdf(ruta) : _ocr(ruta);
 }
 
@@ -31,6 +38,9 @@ Future<List<List<String>>> _ocr(String ruta) async {
     throw UnsupportedError('El OCR de imágenes solo está disponible en iOS');
   }
   final r = await _canalOcr.invokeListMethod<Map>('reconocer', ruta) ?? [];
+  ultimosFragmentos.addAll([
+    for (final m in r) {for (final e in m.entries) '${e.key}': e.value},
+  ]);
   final fr = [
     for (final m in r)
       FragmentoOcr(

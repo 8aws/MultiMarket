@@ -487,6 +487,8 @@ class Settings {
     this.enviarErrores = false,
     this.copiaPrivada = false,
     this.compartirPrecios = true,
+    this.modoDesarrollo = false,
+    this.muestrasTickets = false,
   }) : enabled = enabled ?? {},
        favChains = favChains ?? {};
 
@@ -510,6 +512,10 @@ class Settings {
   copiaPrivada; // copia de la lista privada en el servidor (opcional, desactivada por defecto)
   bool
   compartirPrecios; // aportar a la base común los precios de tus tickets (anónimo)
+  bool
+  modoDesarrollo; // se activa tocando 7 veces la versión en Ajustes: muestra opciones para el desarrollador
+  bool
+  muestrasTickets; // guarda en el servidor muestras de tus tickets para mejorar la lectura (solo si el administrador autoriza tu usuario)
   bool recompra; // sugerencias «fantasma» de reposición según tu historial
   bool
   detectarTienda; // al marcar comprado, usa la ubicación para saber en qué tienda estás
@@ -540,6 +546,8 @@ class Settings {
     'enviarErrores': enviarErrores,
     'copiaPrivada': copiaPrivada,
     'compartirPrecios': compartirPrecios,
+    'modoDesarrollo': modoDesarrollo,
+    'muestrasTickets': muestrasTickets,
   };
 
   factory Settings.fromJson(Map<String, dynamic> j) => Settings(
@@ -564,6 +572,8 @@ class Settings {
     enviarErrores: j['enviarErrores'] ?? false,
     copiaPrivada: j['copiaPrivada'] ?? false,
     compartirPrecios: j['compartirPrecios'] ?? true,
+    modoDesarrollo: j['modoDesarrollo'] ?? false,
+    muestrasTickets: j['muestrasTickets'] ?? false,
   );
 }
 
