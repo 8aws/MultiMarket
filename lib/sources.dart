@@ -208,21 +208,27 @@ const _ofFields =
     'code,product_name,product_name_es,brands,quantity,image_front_small_url,categories_tags,stores,countries_tags';
 
 /// Búsqueda de texto con la API nueva (search-a-licious), solo productos de España.
-Future<List<Product>> searchProducts(String q) async {
-  final uri = Uri.https('search.openfoodfacts.org', '/search', {
-    'q': '$q countries_tags:"en:spain"',
-    'page_size': '10',
-    'langs': 'es',
-    'fields': _ofFields,
-  });
-  final r = await http
-      .get(uri, headers: _ua)
-      .timeout(const Duration(seconds: 8));
-  if (r.statusCode != 200) return [];
-  final hits = (jsonDecode(r.body)['hits'] as List?) ?? [];
-  return [
-    for (final h in hits) ?productFromOff((h as Map).cast<String, dynamic>()),
-  ];
+Future<List<Product>> searchProducts(String q, {http.Client? cliente}) async {
+  final c = cliente ?? http.Client();
+  // El campo del país cambia de nombre cuando Open Food Facts reindexa (`countries_tags` pasó a `countries`):
+  // si la consulta con país falla se reintenta sin él, y los productos de fuera se descartan por el nombre.
+  for (final consulta in ['$q countries:"en:spain"', q]) {
+    final uri = Uri.https('search.openfoodfacts.org', '/search', {
+      'q': consulta,
+      'page_size': '10',
+      'langs': 'es',
+      'fields': _ofFields,
+    });
+    final r = await c
+        .get(uri, headers: _ua)
+        .timeout(const Duration(seconds: 8));
+    if (r.statusCode != 200) continue;
+    final hits = (jsonDecode(r.body)['hits'] as List?) ?? [];
+    return [
+      for (final h in hits) ?productFromOff((h as Map).cast<String, dynamic>()),
+    ];
+  }
+  return [];
 }
 
 /// Un producto por su código de barras (EAN/UPC).
