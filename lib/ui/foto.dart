@@ -266,6 +266,7 @@ Future<void> aniadirFoto(
       bytes: bytes,
       filename: 'foto.jpg',
     );
+    s.marcarFotoCompartida(p.key);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

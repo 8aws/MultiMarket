@@ -147,7 +147,7 @@ class _TicketPageState extends State<TicketPage> {
   Future<void> _procesar(List<List<String>> tickets) async {
     final s = AppScope.of(context);
     final l = <_Leido>[];
-    if (s.cfg.muestrasTickets) {
+    if ((s.cfg.muestrasTickets || s.cfg.ticketsOriginales)) {
       _muestra ??= _Muestra('texto', const [], null, null);
       _muestra!.lineas = tickets;
     }
@@ -179,7 +179,7 @@ class _TicketPageState extends State<TicketPage> {
     try {
       final s = AppScope.of(context);
       List<int>? bytes;
-      if (s.cfg.muestrasTickets) {
+      if ((s.cfg.muestrasTickets || s.cfg.ticketsOriginales)) {
         try {
           final f = File(ruta);
           if (await f.length() <= 8 * 1024 * 1024) {
@@ -188,7 +188,7 @@ class _TicketPageState extends State<TicketPage> {
         } catch (_) {}
       }
       final lineas = await leerTickets(ruta);
-      if (s.cfg.muestrasTickets) {
+      if ((s.cfg.muestrasTickets || s.cfg.ticketsOriginales)) {
         _muestra = _Muestra(
           ultimaFuente,
           [...ultimosFragmentos],

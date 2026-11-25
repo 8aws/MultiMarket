@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'catalog.dart' show genericKey;
 import 'models.dart';
+import 'copia_fotos.dart';
 import 'icloud.dart';
 import 'notifier.dart';
 import 'nutricion.dart';
@@ -101,6 +102,8 @@ class AppState extends ChangeNotifier {
 
   /// Fotos propias (solo en este dispositivo): clave de producto → ruta del archivo.
   final Map<String, String> fotosLocales = {};
+  final Set<String> fotosCompartidas =
+      {}; // claves de producto cuya foto ya se envió a la base común
 
   /// Última foto enlazada (Open Food Facts o comunidad) de cada producto: permite recuperarla desde el historial.
   final Map<String, String> imagenesUrl = {};
@@ -183,6 +186,10 @@ class AppState extends ChangeNotifier {
       imagenesUrl.addAll(
         (jsonDecode(_prefs.getString('imagenesUrl') ?? '{}') as Map)
             .cast<String, String>(),
+      );
+      fotosCompartidas.addAll(
+        (jsonDecode(_prefs.getString('fotosCompartidas') ?? '[]') as List)
+            .cast<String>(),
       );
       fotosLocales.addAll(
         (jsonDecode(_prefs.getString('fotosLocales') ?? '{}') as Map)
@@ -283,6 +290,7 @@ class AppState extends ChangeNotifier {
       );
     }
     _prefs.setString('fotosLocales', jsonEncode(fotosLocales));
+    _prefs.setString('fotosCompartidas', jsonEncode(fotosCompartidas.toList()));
     _prefs.setString('imagenesUrl', jsonEncode(imagenesUrl));
     _prefs.setString('confPrecio', jsonEncode(confPrecio));
     _prefs.setString(
@@ -406,6 +414,8 @@ class AppState extends ChangeNotifier {
   DateTime? copiaParaRestaurar;
   Timer? _copiaTimer;
   String _copiaHash = '';
+  bool copiaEnICloud =
+      false; // la copia ofrecida para restaurar está en iCloud (no en el servidor)
 
   Map<String, dynamic> _datosCopia() {
     List<dynamic> lista(String k) =>
@@ -428,6 +438,21 @@ class AppState extends ChangeNotifier {
       'aliasTicket': aliasTicket,
       'local': jsonDecode(_prefs.getString('local') ?? '{}'),
       'imagenesUrl': imagenesUrl,
+      // ajustes (sin lo que debe quedar desactivado y sin el servidor) y tiendas elegidas
+      'ajustes': {
+        for (final e in cfg.toJson().entries)
+          if (!{
+            'serverUrl',
+            'modoDesarrollo',
+            'muestrasTickets',
+            'ticketsOriginales',
+            'copiaICloud',
+            'copiaPrivada',
+          }.contains(e.key))
+            e.key: e.value,
+      },
+      'tiendas': stores.map((s) => s.toJson()).toList(),
+      'tiendasExtra': extraStores.values.map((s) => s.toJson()).toList(),
     };
   }
 
@@ -464,6 +489,15 @@ class AppState extends ChangeNotifier {
   /// Mira si hay copia en el servidor y este dispositivo está vacío: entonces se ofrece restaurarla.
   Future<void> consultarCopia() async {
     try {
+      if (_privadaVacia && await ICloud.disponible()) {
+        final f = await ICloud.modificado('Copia/multimarket-copia.json');
+        if (f != null) {
+          copiaParaRestaurar = f;
+          copiaEnICloud = true;
+          notifyListeners();
+          return;
+        }
+      }
       if (!await sync.api.tieneCuenta || !_privadaVacia) return;
       final c = await sync.api.copiaActual();
       if (c == null) return;
@@ -472,6 +506,7 @@ class AppState extends ChangeNotifier {
           ((d['compras'] as List?)?.isEmpty ?? true)) {
         return;
       }
+      copiaEnICloud = false;
       copiaParaRestaurar =
           DateTime.tryParse(
             '${c['updated']}'.replaceFirst(' ', 'T'),
@@ -499,6 +534,21 @@ class AppState extends ChangeNotifier {
     }
     final loc = jsonDecode(_prefs.getString('local') ?? '{}') as Map;
     guarda('local', {...((d['local'] as Map?) ?? {}), ...loc});
+    final aj = d['ajustes'];
+    if (aj is Map) {
+      // lo que debe seguir desactivado o es de este dispositivo no se toca
+      final nuevo = Settings.fromJson(aj.cast<String, dynamic>())
+        ..serverUrl = cfg.serverUrl
+        ..modoDesarrollo = cfg.modoDesarrollo
+        ..muestrasTickets = cfg.muestrasTickets
+        ..ticketsOriginales = cfg.ticketsOriginales
+        ..copiaICloud = cfg.copiaICloud
+        ..copiaPrivada = cfg.copiaPrivada;
+      guarda('cfg', nuevo.toJson());
+    }
+    if (d['tiendas'] is List) guarda('stores', d['tiendas']);
+    if (d['tiendasExtra'] is List) guarda('extraStores', d['tiendasExtra']);
+    extraStores.clear();
     for (final m in [
       exclusivos,
       frioManual,
@@ -514,11 +564,13 @@ class AppState extends ChangeNotifier {
     _offers.clear();
     _load();
     copiaParaRestaurar = null;
+    copiaEnICloud = false;
     changed();
   }
 
   /// Restaura la lista privada desde la copia del servidor. Devuelve un mensaje de error o null si fue bien.
   Future<String?> restaurarCopia() async {
+    if (copiaEnICloud) return restaurarDeICloud();
     try {
       final c = await sync.api.copiaActual();
       if (c == null) return 'No hay copia en el servidor';
@@ -1631,9 +1683,10 @@ class AppState extends ChangeNotifier {
     return marcados;
   }
 
-  /// Muestra de desarrollo: texto leído, resultado final e imagen de un ticket, en una carpeta de TU iCloud Drive
-  /// (MultiMarket/Muestras/AAAA-MM-DD/HHMMSS-fuente/) para revisar y mejorar la lectura desde el Mac. Nada pasa por
-  /// nuestro servidor. Solo si lo activas en Ajustes (modo desarrollo). Devuelve un mensaje de error o null si fue bien.
+  /// Guarda en TU iCloud Drive el texto leído, el resultado final y la imagen de un ticket importado:
+  ///  · «Tickets originales» (opción de todos, desactivada por defecto): `Tickets/AAAA-MM-DD/HHMMSS-fuente/`.
+  ///  · «Muestras de desarrollo» (opción oculta): `Muestras/…`, con además el OCR en bruto para depurar el lector.
+  /// Nada pasa por nuestro servidor. Devuelve un mensaje de error o null si fue bien (o no había nada activado).
   Future<String?> guardarMuestra({
     required String fuente,
     required List<Map<String, dynamic>> fragmentos,
@@ -1642,7 +1695,7 @@ class AppState extends ChangeNotifier {
     List<int>? imagen,
     String? nombreImagen,
   }) async {
-    if (!cfg.muestrasTickets) return null;
+    if (!cfg.muestrasTickets && !cfg.ticketsOriginales) return null;
     try {
       if (!await ICloud.disponible()) {
         return 'iCloud no está disponible (¿sesión iniciada?)';
@@ -1650,55 +1703,105 @@ class AppState extends ChangeNotifier {
       final n = DateTime.now();
       String d2(int v) => v.toString().padLeft(2, '0');
       final dia = '${n.year}-${d2(n.month)}-${d2(n.day)}';
-      final carpeta =
-          'Muestras/$dia/${d2(n.hour)}${d2(n.minute)}${d2(n.second)}-$fuente';
-      Future<void> json(String nombre, Object o) =>
-          ICloud.escribir('$carpeta/$nombre', utf8.encode(jsonEncode(o)));
-      await json('lineas.json', lineas);
-      await json('resultado.json', {
-        'version': versionApp,
-        'tickets': resultado,
-      });
-      if (fragmentos.isNotEmpty) await json('fragmentos.json', fragmentos);
-      if (imagen != null && nombreImagen != null) {
-        await ICloud.escribir('$carpeta/$nombreImagen', imagen);
+      final hora = '${d2(n.hour)}${d2(n.minute)}${d2(n.second)}-$fuente';
+      for (final raiz in [
+        if (cfg.ticketsOriginales) 'Tickets',
+        if (cfg.muestrasTickets) 'Muestras',
+      ]) {
+        final carpeta = '$raiz/$dia/$hora';
+        Future<void> json(String nombre, Object o) =>
+            ICloud.escribir('$carpeta/$nombre', utf8.encode(jsonEncode(o)));
+        await json('lineas.json', lineas);
+        await json('resultado.json', {
+          'version': versionApp,
+          'tickets': resultado,
+        });
+        if (raiz == 'Muestras' && fragmentos.isNotEmpty) {
+          await json('fragmentos.json', fragmentos);
+        }
+        if (imagen != null && nombreImagen != null) {
+          await ICloud.escribir('$carpeta/$nombreImagen', imagen);
+        }
       }
       unawaited(purgarMuestras());
       return null;
     } catch (_) {
-      return 'No se pudo guardar la muestra en iCloud';
+      return 'No se pudo guardar en iCloud';
     }
   }
 
-  /// Borra las muestras de iCloud más antiguas que el plazo elegido (0 = inmediato: todas las ya guardadas
-  /// al abrir la app). Se ejecuta al abrir la app y tras guardar una muestra. Solo si el borrado automático está activo.
-  Future<void> purgarMuestras({bool ahora = false}) async {
-    if (!ahora && (!cfg.muestrasTickets && !cfg.modoDesarrollo)) return;
-    if (!ahora && !cfg.borradoMuestras) return;
+  /// Borra de iCloud lo que supera el plazo elegido: «Tickets» (siempre, plazo propio) y «Muestras» (si el borrado
+  /// automático está activo; plazo 0 = inmediato: al volver a abrir la app). `ahora` borra todo sin esperar.
+  Future<void> purgarMuestras({
+    bool ahora = false,
+    bool soloMuestras = false,
+  }) async {
     try {
-      final limite = DateTime.now().subtract(
-        Duration(days: cfg.retencionMuestrasDias),
-      );
-      for (final dia in await ICloud.listar('Muestras')) {
-        if (!dia.carpeta) continue;
-        final f = DateTime.tryParse(dia.nombre);
-        // la carpeta del día se mira por su fecha; con plazo 0 se borran las de días anteriores y las de hace más de una hora
-        final viejo = f != null && f.isBefore(limite);
-        if (cfg.retencionMuestrasDias == 0 || ahora) {
-          for (final m in await ICloud.listar('Muestras/${dia.nombre}')) {
-            if (DateTime.now().difference(m.modificado).inMinutes >= 60 ||
-                ahora) {
-              await ICloud.borrar('Muestras/${dia.nombre}/${m.nombre}');
-            }
-          }
-          if ((await ICloud.listar('Muestras/${dia.nombre}')).isEmpty) {
-            await ICloud.borrar('Muestras/${dia.nombre}');
-          }
-        } else if (viejo) {
-          await ICloud.borrar('Muestras/${dia.nombre}');
+      if (!await ICloud.disponible()) return;
+      if (ahora || cfg.ticketsOriginales || cfg.muestrasTickets) {
+        if (!soloMuestras) {
+          await _purgarCarpeta(
+            'Tickets',
+            cfg.retencionTicketsDias,
+            ahora: ahora,
+          );
+        }
+        if (ahora || cfg.borradoMuestras) {
+          await _purgarCarpeta(
+            'Muestras',
+            cfg.retencionMuestrasDias,
+            ahora: ahora,
+          );
         }
       }
     } catch (_) {}
+  }
+
+  Future<void> _purgarCarpeta(
+    String raiz,
+    int dias, {
+    required bool ahora,
+  }) async {
+    final limite = DateTime.now().subtract(Duration(days: dias));
+    for (final dia in await ICloud.listar(raiz)) {
+      if (!dia.carpeta) continue;
+      final ruta = '$raiz/${dia.nombre}';
+      final f = DateTime.tryParse(dia.nombre);
+      if (ahora || (dias == 0 && f != null && f.isBefore(_hoy()))) {
+        await ICloud.borrar(ruta);
+      } else if (dias == 0) {
+        // plazo inmediato: del día de hoy se borra lo que tenga más de una hora
+        for (final m in await ICloud.listar(ruta)) {
+          if (DateTime.now().difference(m.modificado).inMinutes >= 60) {
+            await ICloud.borrar('$ruta/${m.nombre}');
+          }
+        }
+      } else if (f != null && f.isBefore(limite)) {
+        await ICloud.borrar(ruta);
+      }
+    }
+  }
+
+  DateTime _hoy() {
+    final n = DateTime.now();
+    return DateTime(n.year, n.month, n.day);
+  }
+
+  /// Borra de tu iCloud TODO lo de MultiMarket: copia, fotos, tickets y muestras.
+  Future<String?> borrarTodoICloud() async {
+    try {
+      if (!await ICloud.disponible()) return 'iCloud no está disponible';
+      for (final r in ['Copia', 'Tickets', 'Muestras']) {
+        try {
+          await ICloud.borrar(r);
+        } catch (_) {}
+      }
+      _prefs.remove('copiaICloudFecha');
+      _prefs.remove('fotosICloud');
+      return null;
+    } catch (_) {
+      return 'No se pudo borrar';
+    }
   }
 
   // ------------------------------------------------------- copia en iCloud
@@ -1720,6 +1823,7 @@ class AppState extends ChangeNotifier {
         return 'iCloud no está disponible (¿sesión iniciada?)';
       }
       await ICloud.escribir('Copia/multimarket-copia.json', copiaEnArchivo());
+      if (!kIsWeb) await guardarFotosEnICloud(this);
       _prefs.setString('copiaICloudFecha', DateTime.now().toIso8601String());
       return null;
     } catch (_) {
@@ -1738,7 +1842,9 @@ class AppState extends ChangeNotifier {
       }
       final b = await ICloud.leer('Copia/multimarket-copia.json');
       if (b == null) return 'No hay copia en tu iCloud';
-      return restaurarDeArchivo(utf8.decode(b));
+      final e = restaurarDeArchivo(utf8.decode(b));
+      if (e == null && !kIsWeb) await restaurarFotosDeICloud(this);
+      return e;
     } catch (_) {
       return 'No se pudo leer la copia de iCloud';
     }
@@ -2028,6 +2134,22 @@ class AppState extends ChangeNotifier {
   }
 
   /// Foto propia de un producto (solo en este dispositivo). `path` null = quitarla.
+  /// La foto de este producto ya está en la base común (no hace falta guardarla en la copia).
+  void marcarFotoCompartida(String key) {
+    fotosCompartidas.add(key);
+    changed();
+  }
+
+  /// Vuelve a poner una foto propia (al restaurar una copia) sin duplicar la que ya hubiera.
+  void restaurarFotoLocal(String key, String path) {
+    if (fotosLocales.containsKey(key)) return;
+    fotosLocales[key] = path;
+    for (final x in allItems.where((x) => productOf(x).key == key)) {
+      x.localImage = path;
+    }
+    changed();
+  }
+
   void setFotoLocal(Item it, String? path) {
     final key = productOf(it).key;
     if (path == null) {

@@ -462,7 +462,7 @@ class Aviso {
 }
 
 /// Versión de la app (mantener igual que `version` de pubspec.yaml); se añade a los informes de errores.
-const versionApp = '1.1.0+13';
+const versionApp = '1.1.0+14';
 
 class Settings {
   Settings({
@@ -492,6 +492,8 @@ class Settings {
     this.copiaICloud = false,
     this.borradoMuestras = true,
     this.retencionMuestrasDias = 90,
+    this.ticketsOriginales = false,
+    this.retencionTicketsDias = 30,
   }) : enabled = enabled ?? {},
        favChains = favChains ?? {};
 
@@ -524,6 +526,9 @@ class Settings {
   bool
   borradoMuestras; // borrar solas las muestras antiguas (activado por defecto)
   int retencionMuestrasDias; // 0 = inmediato · 7 · 30 · 90 (por defecto) · 365
+  bool
+  ticketsOriginales; // guardar en TU iCloud la imagen y el texto de cada ticket importado (desactivado por defecto)
+  int retencionTicketsDias; // 7 · 30 (recomendado) · 90 · 365
   bool recompra; // sugerencias «fantasma» de reposición según tu historial
   bool
   detectarTienda; // al marcar comprado, usa la ubicación para saber en qué tienda estás
@@ -559,6 +564,8 @@ class Settings {
     'copiaICloud': copiaICloud,
     'borradoMuestras': borradoMuestras,
     'retencionMuestrasDias': retencionMuestrasDias,
+    'ticketsOriginales': ticketsOriginales,
+    'retencionTicketsDias': retencionTicketsDias,
   };
 
   factory Settings.fromJson(Map<String, dynamic> j) => Settings(
@@ -588,6 +595,8 @@ class Settings {
     copiaICloud: j['copiaICloud'] ?? false,
     borradoMuestras: j['borradoMuestras'] ?? true,
     retencionMuestrasDias: j['retencionMuestrasDias'] ?? 90,
+    ticketsOriginales: j['ticketsOriginales'] ?? false,
+    retencionTicketsDias: j['retencionTicketsDias'] ?? 30,
   );
 }
 

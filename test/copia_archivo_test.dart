@@ -15,6 +15,9 @@ void main() {
       final a = AppState(await SharedPreferences.getInstance());
       final it = a.add(Product(name: 'Leche entera', cold: true));
       a.setPrice(it, 1.05);
+      a.cfg.radiusKm = 7;
+      a.cfg.modoDesarrollo = true;
+      a.cfg.ticketsOriginales = true;
       final bytes = a.copiaEnArchivo();
       final j = jsonDecode(utf8.decode(bytes)) as Map;
       expect(j['multimarket'], 1);

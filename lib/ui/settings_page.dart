@@ -766,6 +766,102 @@ class SettingsPage extends StatelessWidget {
                     },
                   ),
                 ],
+                if (defaultTargetPlatform == TargetPlatform.iOS && !kIsWeb) ...[
+                  SwitchListTile(
+                    title: const Text(
+                      'Guardar mis tickets originales en iCloud',
+                    ),
+                    subtitle: const Text(
+                      'Imagen o PDF y texto leído de cada ticket que importes, en TU iCloud Drive (carpeta MultiMarket/Tickets), '
+                      'por si hay que revisar la lectura. Nunca pasan por nuestro servidor. Desactivado por defecto.',
+                    ),
+                    value: c.ticketsOriginales,
+                    onChanged: (v) async {
+                      if (v) {
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Tickets originales en iCloud'),
+                            content: const Text(
+                              'Un ticket puede llevar datos personales (tarjeta, tienda, hora). Se guardarán solo en tu iCloud y '
+                              'se borrarán solos pasado un plazo.\n\nPlazo recomendado: un mes, suficiente para revisarlos y sin dejarlos '
+                              'guardados mucho tiempo. Puedes cambiarlo cuando quieras.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text('Ahora no'),
+                              ),
+                              FilledButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: const Text('Activar (1 mes)'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (ok != true) return;
+                        c.retencionTicketsDias = 30;
+                      }
+                      c.ticketsOriginales = v;
+                      s.changed();
+                    },
+                  ),
+                  if (c.ticketsOriginales)
+                    ListTile(
+                      title: const Text('Borrar los tickets guardados a los…'),
+                      subtitle: const Text('Recomendado: 1 mes.'),
+                      trailing: DropdownButton<int>(
+                        value: c.retencionTicketsDias,
+                        items: const [
+                          DropdownMenuItem(value: 7, child: Text('1 semana')),
+                          DropdownMenuItem(value: 30, child: Text('1 mes')),
+                          DropdownMenuItem(value: 90, child: Text('3 meses')),
+                          DropdownMenuItem(value: 365, child: Text('1 año')),
+                        ],
+                        onChanged: (v) {
+                          c.retencionTicketsDias = v ?? 30;
+                          s.changed();
+                        },
+                      ),
+                    ),
+                  ListTile(
+                    leading: const Icon(Icons.delete_forever_outlined),
+                    title: const Text('Borrar todo lo mío de iCloud'),
+                    subtitle: const Text(
+                      'Copia, fotos, tickets y muestras de la carpeta MultiMarket.',
+                    ),
+                    onTap: () async {
+                      final mensajes = ScaffoldMessenger.of(context);
+                      final ok = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('¿Borrar todo de iCloud?'),
+                          content: const Text(
+                            'Se borrará la carpeta de MultiMarket de tu iCloud Drive. No afecta a lo que tienes en este móvil.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancelar'),
+                            ),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Borrar'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (ok != true) return;
+                      final e = await s.borrarTodoICloud();
+                      mensajes.showSnackBar(
+                        SnackBar(
+                          content: Text(e ?? 'iCloud limpio'),
+                          showCloseIcon: true,
+                        ),
+                      );
+                    },
+                  ),
+                ],
                 ListTile(
                   leading: const Icon(Icons.ios_share),
                   title: const Text('Guardar una copia en un archivo'),
@@ -999,7 +1095,7 @@ class SettingsPage extends StatelessWidget {
                     leading: const Icon(Icons.delete_sweep_outlined),
                     title: const Text('Borrar ahora todas las muestras'),
                     onTap: () async {
-                      await s.purgarMuestras(ahora: true);
+                      await s.purgarMuestras(ahora: true, soloMuestras: true);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
