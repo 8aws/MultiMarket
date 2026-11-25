@@ -8,6 +8,7 @@ import '../main.dart';
 import '../models.dart';
 import '../sources.dart';
 import '../state.dart';
+import '../ticket/ticket_match.dart' show normalizarNombre;
 import 'adaptativo.dart';
 import 'ficha.dart';
 import 'ticket_page.dart';
@@ -1678,9 +1679,21 @@ class _AddSheetState extends State<AddSheet> {
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
     final text = _c.text.trim();
+    // 1º lo que ya has añadido o comprado, 2º ejemplos locales, 3º resultados de la base común y de Open Food Facts
+    final previos = esCodigoDeBarras.hasMatch(text)
+        ? <Product>[]
+        : s.productosPrevios(text);
+    bool repetido(Product o) => previos.any(
+      (p) =>
+          (o.barcode != null && o.barcode == p.barcode) ||
+          normalizarNombre(o.name) == normalizarNombre(p.name),
+    );
     final sugg = <Product>[
-      ..._local(s),
-      ..._online.where((o) => !_local(s).any((l) => l.name == o.name)),
+      ...previos,
+      ..._local(s).where((l) => !repetido(l)),
+      ..._online.where(
+        (o) => !repetido(o) && !_local(s).any((l) => l.name == o.name),
+      ),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -1833,7 +1846,18 @@ class _AddSheetState extends State<AddSheet> {
                             'Exclusivo ${prettyChain(p.ownChain!)}',
                         ].join(' · '),
                       ),
-                      trailing: p.cold ? const Text('❄️') : null,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (previos.contains(p))
+                            Icon(
+                              Icons.history,
+                              size: 18,
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
+                          if (p.cold) const Text('❄️'),
+                        ],
+                      ),
                       onTap: () => _add(p),
                     ),
                   if (_searching) const LinearProgressIndicator(minHeight: 2),

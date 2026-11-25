@@ -116,4 +116,32 @@ void main() {
       s.dispose();
     },
   );
+
+  test(
+    'al añadir: primero lo que ya compraste (más veces antes), con búsqueda por comienzo de palabra',
+    () async {
+      final s = await estado();
+      Compra c(String id, String nombre, int ms) => Compra(
+        id: id.padRight(15, '0'),
+        itemId: id,
+        key: nombre.toLowerCase(),
+        name: nombre,
+        qty: 1,
+        ms: ms,
+      );
+      s.compras
+        ..add(c('a1', 'Leche de avena', 1000))
+        ..add(c('b1', 'Leche entera', 2000))
+        ..add(c('b2', 'Leche entera', 3000))
+        ..add(c('c1', 'Arroz largo', 4000));
+      final r = s.productosPrevios('lec');
+      expect(r.map((p) => p.name), ['Leche entera', 'Leche de avena']);
+      expect(s.productosPrevios('leche ent').map((p) => p.name), [
+        'Leche entera',
+      ]);
+      expect(s.productosPrevios('xyz'), isEmpty);
+      expect(s.productosPrevios('l'), isEmpty, reason: 'una letra no basta');
+      s.dispose();
+    },
+  );
 }

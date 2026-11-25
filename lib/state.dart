@@ -1743,6 +1743,48 @@ class AppState extends ChangeNotifier {
     );
   }
 
+  /// Productos que ya has añadido o comprado antes y encajan con lo que escribes (cada palabra es el comienzo de alguna del nombre).
+  /// Los más comprados primero y, a igualdad, los más recientes. Van antes que los resultados de las bases abiertas.
+  List<Product> productosPrevios(String consulta, {int max = 6}) {
+    final q = normalizarNombre(
+      consulta,
+    ).split(' ').where((w) => w.length >= 2).toList();
+    if (q.isEmpty) return const [];
+    final vistos = <String, ({Product p, int veces, int ms})>{};
+    void ver(String key, String nombre, {String? genericKey, int ms = 0}) {
+      final pal = normalizarNombre(nombre).split(' ');
+      if (!q.every((w) => pal.any((x) => x.startsWith(w)))) return;
+      final previo = vistos[key];
+      final esCodigo = RegExp(r'^\d{8,14}$').hasMatch(key);
+      vistos[key] = (
+        p:
+            previo?.p ??
+            Product(
+              name: nombre,
+              barcode: esCodigo ? key : null,
+              cold: frioManual[key] ?? looksCold(nombre),
+              imageUrl: imagenesUrl[key],
+              genericKey: genericKey,
+            ),
+        veces: (previo?.veces ?? 0) + 1,
+        ms: ms > (previo?.ms ?? 0) ? ms : (previo?.ms ?? 0),
+      );
+    }
+
+    for (final c in compras) {
+      ver(c.key, c.name, ms: c.ms);
+    }
+    for (final it in items) {
+      ver(productOf(it).key, it.name, genericKey: it.genericKey);
+    }
+    final l = vistos.values.toList()
+      ..sort((a, b) {
+        final c = b.veces.compareTo(a.veces);
+        return c != 0 ? c : b.ms.compareTo(a.ms);
+      });
+    return [for (final e in l.take(max)) e.p];
+  }
+
   /// Convierte una sugerencia en un producto real de la lista.
   Item anadirSugerencia(Sugerencia sg) {
     final esCodigo = RegExp(r'^\d{8,14}$').hasMatch(sg.key);
