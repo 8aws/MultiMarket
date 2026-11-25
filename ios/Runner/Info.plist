@@ -8,6 +8,18 @@
 	<array>
 		<string>loywallet</string>
 	</array>
+	<key>NSUbiquitousContainers</key>
+	<dict>
+		<key>iCloud.es.uverse.multimarket</key>
+		<dict>
+			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
+			<true/>
+			<key>NSUbiquitousContainerName</key>
+			<string>MultiMarket</string>
+			<key>NSUbiquitousContainerSupportedFolderLevels</key>
+			<string>Any</string>
+		</dict>
+	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>MultiMarket usa la cámara para fotografiar productos que no tienen imagen y para leer tickets de compra (la imagen se procesa en tu dispositivo y se borra al terminar).</string>
 	<key>NSPhotoLibraryUsageDescription</key>

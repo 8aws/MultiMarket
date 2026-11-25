@@ -296,7 +296,7 @@ class _TicketPageState extends State<TicketPage> {
     }
     if (muestra != null) {
       unawaited(
-        s.subirMuestra(
+        s.guardarMuestra(
           fuente: muestra.fuente,
           fragmentos: muestra.fragmentos,
           lineas: muestra.lineas,

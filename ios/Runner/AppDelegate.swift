@@ -14,6 +14,7 @@ import Vision
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     registrarOcr(engineBridge.pluginRegistry)
+    registrarICloud(engineBridge.pluginRegistry)
   }
 
   /// OCR de tickets con el reconocimiento de texto nativo de Apple (Vision). Todo ocurre en el dispositivo.
@@ -93,6 +94,84 @@ import Vision
           return
         }
         DispatchQueue.main.async { result(salida) }
+      }
+    }
+  }
+
+  // MARK: - iCloud Drive (copia de seguridad y muestras de desarrollo)
+  private static let contenedorICloud = "iCloud.es.uverse.multimarket"
+  private let colaICloud = DispatchQueue(label: "es.uverse.multimarket.icloud", qos: .utility)
+
+  /// Ficheros en <contenedor>/Documents/<ruta>. Todo fuera del hilo principal (obtener el contenedor puede bloquear) y con
+  /// NSFileCoordinator para que iCloud nunca vea un fichero a medio escribir. La ruta puede llevar subcarpetas.
+  private func registrarICloud(_ registry: FlutterPluginRegistry) {
+    guard let reg = registry.registrar(forPlugin: "MMICloud") else { return }
+    let canal = FlutterMethodChannel(name: "es.uverse.multimarket/icloud", binaryMessenger: reg.messenger())
+    canal.setMethodCallHandler { [weak self] call, result in
+      guard let self = self else { return }
+      self.colaICloud.async {
+        let args = call.arguments as? [String: Any]
+        let ok: (Any?) -> Void = { v in DispatchQueue.main.async { result(v) } }
+        let fallo: (String, String) -> Void = { c, m in
+          DispatchQueue.main.async { result(FlutterError(code: c, message: m, details: nil)) }
+        }
+        guard FileManager.default.ubiquityIdentityToken != nil,
+              let base = FileManager.default.url(forUbiquityContainerIdentifier: AppDelegate.contenedorICloud) else {
+          if call.method == "disponible" { ok(false) } else { fallo("no_disponible", "iCloud no disponible") }
+          return
+        }
+        let docs = base.appendingPathComponent("Documents", isDirectory: true)
+        func url(_ ruta: String) -> URL? {
+          // sin «..» ni rutas absolutas: nunca se sale de Documents
+          if ruta.hasPrefix("/") || ruta.contains("..") { return nil }
+          return docs.appendingPathComponent(ruta)
+        }
+        switch call.method {
+        case "disponible":
+          ok(true)
+        case "escribir":
+          guard let ruta = args?["ruta"] as? String, let u = url(ruta),
+                let datos = (args?["datos"] as? FlutterStandardTypedData)?.data else { fallo("args", "ruta/datos"); return }
+          do {
+            try FileManager.default.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
+            var errCoord: NSError?; var errEsc: Error?
+            NSFileCoordinator().coordinate(writingItemAt: u, options: .forReplacing, error: &errCoord) { destino in
+              do { try datos.write(to: destino, options: .atomic) } catch { errEsc = error }
+            }
+            if let e = errCoord ?? (errEsc as NSError?) { fallo("escritura", e.localizedDescription) } else { ok(true) }
+          } catch { fallo("escritura", error.localizedDescription) }
+        case "leer":
+          guard let ruta = args?["ruta"] as? String, let u = url(ruta) else { fallo("args", "ruta"); return }
+          try? FileManager.default.startDownloadingUbiquitousItem(at: u)
+          var errCoord: NSError?; var salida: Data?
+          NSFileCoordinator().coordinate(readingItemAt: u, options: [], error: &errCoord) { origen in
+            salida = try? Data(contentsOf: origen)
+          }
+          if let s = salida { ok(FlutterStandardTypedData(bytes: s)) } else { ok(nil) }
+        case "info":
+          guard let ruta = args?["ruta"] as? String, let u = url(ruta) else { fallo("args", "ruta"); return }
+          if let a = try? FileManager.default.attributesOfItem(atPath: u.path), let f = a[.modificationDate] as? Date {
+            ok(["modificado": Int(f.timeIntervalSince1970 * 1000), "tamano": (a[.size] as? Int) ?? 0])
+          } else { ok(nil) }
+        case "listar":
+          guard let ruta = args?["ruta"] as? String, let u = url(ruta) else { fallo("args", "ruta"); return }
+          let items = (try? FileManager.default.contentsOfDirectory(
+            at: u, includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey], options: [.skipsHiddenFiles])) ?? []
+          ok(items.map { i -> [String: Any] in
+            let v = try? i.resourceValues(forKeys: [.isDirectoryKey, .contentModificationDateKey])
+            return ["nombre": i.lastPathComponent, "carpeta": v?.isDirectory ?? false,
+                    "modificado": Int((v?.contentModificationDate ?? Date(timeIntervalSince1970: 0)).timeIntervalSince1970 * 1000)]
+          })
+        case "borrar":
+          guard let ruta = args?["ruta"] as? String, let u = url(ruta) else { fallo("args", "ruta"); return }
+          var errCoord: NSError?; var errBorrar: Error?
+          NSFileCoordinator().coordinate(writingItemAt: u, options: .forDeleting, error: &errCoord) { destino in
+            do { try FileManager.default.removeItem(at: destino) } catch { errBorrar = error }
+          }
+          if let e = errCoord ?? (errBorrar as NSError?) { fallo("borrado", e.localizedDescription) } else { ok(true) }
+        default:
+          DispatchQueue.main.async { result(FlutterMethodNotImplemented) }
+        }
       }
     }
   }

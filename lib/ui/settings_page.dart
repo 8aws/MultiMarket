@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -705,6 +707,65 @@ class SettingsPage extends StatelessWidget {
                     }
                   },
                 ),
+                if (defaultTargetPlatform == TargetPlatform.iOS && !kIsWeb) ...[
+                  SwitchListTile(
+                    title: const Text('Copia automática en iCloud'),
+                    subtitle: Text(
+                      'Guarda tu lista privada, historial y precios en TU iCloud Drive (carpeta MultiMarket). No pasa por nuestro servidor.'
+                      '${s.ultimaCopiaICloud == null ? '' : ' Última copia: ${s.ultimaCopiaICloud!.day}/${s.ultimaCopiaICloud!.month}/${s.ultimaCopiaICloud!.year}'}',
+                    ),
+                    value: c.copiaICloud,
+                    onChanged: (v) async {
+                      c.copiaICloud = v;
+                      s.changed();
+                      if (v) {
+                        final e = await s.copiarEnICloud();
+                        if (e != null && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e), showCloseIcon: true),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.cloud_download_outlined),
+                    title: const Text('Restaurar desde iCloud'),
+                    subtitle: const Text(
+                      'Sustituye tu lista privada, historial y precios por la copia de tu iCloud.',
+                    ),
+                    onTap: () async {
+                      final mensajes = ScaffoldMessenger.of(context);
+                      final ok = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('¿Restaurar desde iCloud?'),
+                          content: const Text(
+                            'Tu lista privada, historial y precios actuales se sustituirán por los de la copia.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancelar'),
+                            ),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Restaurar'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (ok != true) return;
+                      final e = await s.restaurarDeICloud();
+                      mensajes.showSnackBar(
+                        SnackBar(
+                          content: Text(e ?? 'Copia restaurada'),
+                          showCloseIcon: true,
+                        ),
+                      );
+                    },
+                  ),
+                ],
                 ListTile(
                   leading: const Icon(Icons.ios_share),
                   title: const Text('Guardar una copia en un archivo'),
@@ -892,10 +953,9 @@ class SettingsPage extends StatelessWidget {
                 children: [
                   SwitchListTile(
                     title: const Text('Enviar muestras de mis tickets'),
-                    subtitle: Text(
-                      'Guarda en tu servidor el texto leído, el resultado corregido y la imagen de cada ticket que importas, '
-                      'para revisar y mejorar la lectura. Solo funciona si el administrador autoriza tu identificador. '
-                      'Se borran a los 90 días. Desactivado por defecto.',
+                    subtitle: const Text(
+                      'Guarda en TU iCloud Drive (MultiMarket/Muestras) el texto leído, el resultado corregido y la imagen de cada ticket que importas, '
+                      'para revisar y mejorar la lectura. No pasa por nuestro servidor. Desactivado por defecto.',
                     ),
                     value: c.muestrasTickets,
                     onChanged: (v) {
@@ -903,19 +963,52 @@ class SettingsPage extends StatelessWidget {
                       s.changed();
                     },
                   ),
+                  SwitchListTile(
+                    title: const Text('Borrado automático de muestras'),
+                    subtitle: const Text('Activado por defecto.'),
+                    value: c.borradoMuestras,
+                    onChanged: (v) {
+                      c.borradoMuestras = v;
+                      s.changed();
+                    },
+                  ),
                   ListTile(
-                    leading: const Icon(Icons.badge_outlined),
-                    title: const Text('Tu identificador'),
-                    subtitle: SelectableText(s.sync.miId ?? 'aún sin sesión'),
-                    trailing: IconButton(
-                      tooltip: 'Copiar',
-                      icon: const Icon(Icons.copy, size: 18),
-                      onPressed: s.sync.miId == null
-                          ? null
-                          : () => Clipboard.setData(
-                              ClipboardData(text: s.sync.miId!),
-                            ),
+                    enabled: c.borradoMuestras,
+                    title: const Text('Conservar las muestras'),
+                    subtitle: const Text(
+                      'Inmediato: se borran al volver a abrir la app.',
                     ),
+                    trailing: DropdownButton<int>(
+                      value: c.retencionMuestrasDias,
+                      items: const [
+                        DropdownMenuItem(value: 0, child: Text('Inmediato')),
+                        DropdownMenuItem(value: 7, child: Text('Semanal')),
+                        DropdownMenuItem(value: 30, child: Text('Mensual')),
+                        DropdownMenuItem(value: 90, child: Text('Trimestral')),
+                        DropdownMenuItem(value: 365, child: Text('Anual')),
+                      ],
+                      onChanged: c.borradoMuestras
+                          ? (v) {
+                              c.retencionMuestrasDias = v ?? 90;
+                              s.changed();
+                            }
+                          : null,
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.delete_sweep_outlined),
+                    title: const Text('Borrar ahora todas las muestras'),
+                    onTap: () async {
+                      await s.purgarMuestras(ahora: true);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Muestras borradas de iCloud'),
+                            showCloseIcon: true,
+                          ),
+                        );
+                      }
+                    },
                   ),
                   ListTile(
                     dense: true,

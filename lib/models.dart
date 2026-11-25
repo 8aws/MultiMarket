@@ -489,6 +489,9 @@ class Settings {
     this.compartirPrecios = true,
     this.modoDesarrollo = false,
     this.muestrasTickets = false,
+    this.copiaICloud = false,
+    this.borradoMuestras = true,
+    this.retencionMuestrasDias = 90,
   }) : enabled = enabled ?? {},
        favChains = favChains ?? {};
 
@@ -515,7 +518,12 @@ class Settings {
   bool
   modoDesarrollo; // se activa tocando 7 veces la versión en Ajustes: muestra opciones para el desarrollador
   bool
-  muestrasTickets; // guarda en el servidor muestras de tus tickets para mejorar la lectura (solo si el administrador autoriza tu usuario)
+  muestrasTickets; // guarda en TU iCloud muestras de tus tickets para revisar la lectura (opción de desarrollo)
+  bool
+  copiaICloud; // copia automática de la lista privada, historial y precios en tu iCloud Drive
+  bool
+  borradoMuestras; // borrar solas las muestras antiguas (activado por defecto)
+  int retencionMuestrasDias; // 0 = inmediato · 7 · 30 · 90 (por defecto) · 365
   bool recompra; // sugerencias «fantasma» de reposición según tu historial
   bool
   detectarTienda; // al marcar comprado, usa la ubicación para saber en qué tienda estás
@@ -548,6 +556,9 @@ class Settings {
     'compartirPrecios': compartirPrecios,
     'modoDesarrollo': modoDesarrollo,
     'muestrasTickets': muestrasTickets,
+    'copiaICloud': copiaICloud,
+    'borradoMuestras': borradoMuestras,
+    'retencionMuestrasDias': retencionMuestrasDias,
   };
 
   factory Settings.fromJson(Map<String, dynamic> j) => Settings(
@@ -574,6 +585,9 @@ class Settings {
     compartirPrecios: j['compartirPrecios'] ?? true,
     modoDesarrollo: j['modoDesarrollo'] ?? false,
     muestrasTickets: j['muestrasTickets'] ?? false,
+    copiaICloud: j['copiaICloud'] ?? false,
+    borradoMuestras: j['borradoMuestras'] ?? true,
+    retencionMuestrasDias: j['retencionMuestrasDias'] ?? 90,
   );
 }
 

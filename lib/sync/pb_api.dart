@@ -549,50 +549,6 @@ class PbApi {
     }
   }
 
-  /// Muestra de un ticket para revisar la lectura (solo usuarios autorizados por el administrador; 403 si no).
-  Future<void> subirMuestra({
-    required String version,
-    required String fuente,
-    required Object fragmentos,
-    required Object lineas,
-    required Object resultado,
-    List<int>? imagen,
-    String? nombreImagen,
-  }) async {
-    await ensureAuth();
-    final req =
-        http.MultipartRequest(
-            'POST',
-            Uri.parse('$baseUrl/api/collections/muestras/records'),
-          )
-          ..headers['Authorization'] = _token!
-          ..fields['version'] = version
-          ..fields['fuente'] = fuente
-          ..fields['fragmentos'] = jsonEncode(fragmentos)
-          ..fields['lineas'] = jsonEncode(lineas)
-          ..fields['resultado'] = jsonEncode(resultado);
-    if (imagen != null && nombreImagen != null) {
-      req.files.add(
-        http.MultipartFile.fromBytes('imagen', imagen, filename: nombreImagen),
-      );
-    }
-    http.Response res;
-    try {
-      res = await http.Response.fromStream(
-        await _http.send(req).timeout(const Duration(seconds: 60)),
-      );
-    } catch (_) {
-      throw PbException(0, 'Sin conexión con el servidor');
-    }
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      String msg = 'No se pudo enviar la muestra';
-      try {
-        msg = (jsonDecode(res.body) as Map)['message'] as String? ?? msg;
-      } catch (_) {}
-      throw PbException(res.statusCode, msg);
-    }
-  }
-
   // ----------------------------------------------------------------- compras
   Future<List<Map<String, dynamic>>> comprasRemotas(String hogarId) async {
     final out = <Map<String, dynamic>>[];

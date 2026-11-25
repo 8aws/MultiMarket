@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'catalog.dart' show genericKey;
 import 'models.dart';
+import 'icloud.dart';
 import 'notifier.dart';
 import 'nutricion.dart';
 import 'recompra.dart';
@@ -27,6 +28,7 @@ class AppState extends ChangeNotifier {
     unawaited(recuperarListas());
     unawaited(refrescarSancion());
     unawaited(consultarCopia());
+    unawaited(purgarMuestras());
   }
 
   final SharedPreferences _prefs;
@@ -260,6 +262,7 @@ class AppState extends ChangeNotifier {
 
   void _save() {
     _programarCopia();
+    _programarCopiaICloud();
     _prefs.setString('cfg', jsonEncode(cfg.toJson()));
     _prefs.setString('exclusivos', jsonEncode(exclusivos));
     _prefs.setString('frioManual', jsonEncode(frioManual));
@@ -1628,10 +1631,10 @@ class AppState extends ChangeNotifier {
     return marcados;
   }
 
-  /// Muestra de desarrollo: texto leído, resultado final e imagen de un ticket, para revisar y mejorar la lectura.
-  /// Solo si lo activas en Ajustes (modo desarrollo) y el administrador ha autorizado tu usuario. Devuelve un mensaje de
-  /// error o null si fue bien (o no estaba activado).
-  Future<String?> subirMuestra({
+  /// Muestra de desarrollo: texto leído, resultado final e imagen de un ticket, en una carpeta de TU iCloud Drive
+  /// (MultiMarket/Muestras/AAAA-MM-DD/HHMMSS-fuente/) para revisar y mejorar la lectura desde el Mac. Nada pasa por
+  /// nuestro servidor. Solo si lo activas en Ajustes (modo desarrollo). Devuelve un mensaje de error o null si fue bien.
+  Future<String?> guardarMuestra({
     required String fuente,
     required List<Map<String, dynamic>> fragmentos,
     required List<List<String>> lineas,
@@ -1641,22 +1644,103 @@ class AppState extends ChangeNotifier {
   }) async {
     if (!cfg.muestrasTickets) return null;
     try {
-      await sync.api.subirMuestra(
-        version: versionApp,
-        fuente: fuente,
-        fragmentos: fragmentos,
-        lineas: lineas,
-        resultado: resultado,
-        imagen: imagen,
-        nombreImagen: nombreImagen,
-      );
+      if (!await ICloud.disponible()) {
+        return 'iCloud no está disponible (¿sesión iniciada?)';
+      }
+      final n = DateTime.now();
+      String d2(int v) => v.toString().padLeft(2, '0');
+      final dia = '${n.year}-${d2(n.month)}-${d2(n.day)}';
+      final carpeta =
+          'Muestras/$dia/${d2(n.hour)}${d2(n.minute)}${d2(n.second)}-$fuente';
+      Future<void> json(String nombre, Object o) =>
+          ICloud.escribir('$carpeta/$nombre', utf8.encode(jsonEncode(o)));
+      await json('lineas.json', lineas);
+      await json('resultado.json', {
+        'version': versionApp,
+        'tickets': resultado,
+      });
+      if (fragmentos.isNotEmpty) await json('fragmentos.json', fragmentos);
+      if (imagen != null && nombreImagen != null) {
+        await ICloud.escribir('$carpeta/$nombreImagen', imagen);
+      }
+      unawaited(purgarMuestras());
       return null;
-    } on PbException catch (e) {
-      return e.status == 403
-          ? 'El servidor no autoriza este usuario para enviar muestras'
-          : e.message;
     } catch (_) {
-      return 'No se pudo enviar la muestra';
+      return 'No se pudo guardar la muestra en iCloud';
+    }
+  }
+
+  /// Borra las muestras de iCloud más antiguas que el plazo elegido (0 = inmediato: todas las ya guardadas
+  /// al abrir la app). Se ejecuta al abrir la app y tras guardar una muestra. Solo si el borrado automático está activo.
+  Future<void> purgarMuestras({bool ahora = false}) async {
+    if (!ahora && (!cfg.muestrasTickets && !cfg.modoDesarrollo)) return;
+    if (!ahora && !cfg.borradoMuestras) return;
+    try {
+      final limite = DateTime.now().subtract(
+        Duration(days: cfg.retencionMuestrasDias),
+      );
+      for (final dia in await ICloud.listar('Muestras')) {
+        if (!dia.carpeta) continue;
+        final f = DateTime.tryParse(dia.nombre);
+        // la carpeta del día se mira por su fecha; con plazo 0 se borran las de días anteriores y las de hace más de una hora
+        final viejo = f != null && f.isBefore(limite);
+        if (cfg.retencionMuestrasDias == 0 || ahora) {
+          for (final m in await ICloud.listar('Muestras/${dia.nombre}')) {
+            if (DateTime.now().difference(m.modificado).inMinutes >= 60 ||
+                ahora) {
+              await ICloud.borrar('Muestras/${dia.nombre}/${m.nombre}');
+            }
+          }
+          if ((await ICloud.listar('Muestras/${dia.nombre}')).isEmpty) {
+            await ICloud.borrar('Muestras/${dia.nombre}');
+          }
+        } else if (viejo) {
+          await ICloud.borrar('Muestras/${dia.nombre}');
+        }
+      }
+    } catch (_) {}
+  }
+
+  // ------------------------------------------------------- copia en iCloud
+  Timer? _copiaICloudTimer;
+
+  void _programarCopiaICloud() {
+    if (!cfg.copiaICloud) return;
+    _copiaICloudTimer?.cancel();
+    _copiaICloudTimer = Timer(
+      const Duration(seconds: 60),
+      () => unawaited(copiarEnICloud()),
+    );
+  }
+
+  /// Guarda la copia (la misma que la del archivo) en `Copia/multimarket-copia.json` de tu iCloud Drive.
+  Future<String?> copiarEnICloud() async {
+    try {
+      if (!await ICloud.disponible()) {
+        return 'iCloud no está disponible (¿sesión iniciada?)';
+      }
+      await ICloud.escribir('Copia/multimarket-copia.json', copiaEnArchivo());
+      _prefs.setString('copiaICloudFecha', DateTime.now().toIso8601String());
+      return null;
+    } catch (_) {
+      return 'No se pudo guardar la copia en iCloud';
+    }
+  }
+
+  DateTime? get ultimaCopiaICloud =>
+      DateTime.tryParse(_prefs.getString('copiaICloudFecha') ?? '');
+
+  /// Restaura la copia de tu iCloud Drive. Devuelve un mensaje de error o null si fue bien.
+  Future<String?> restaurarDeICloud() async {
+    try {
+      if (!await ICloud.disponible()) {
+        return 'iCloud no está disponible (¿sesión iniciada?)';
+      }
+      final b = await ICloud.leer('Copia/multimarket-copia.json');
+      if (b == null) return 'No hay copia en tu iCloud';
+      return restaurarDeArchivo(utf8.decode(b));
+    } catch (_) {
+      return 'No se pudo leer la copia de iCloud';
     }
   }
 
